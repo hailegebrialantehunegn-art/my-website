@@ -78,62 +78,41 @@ header p {
   background: #d43f67;
 }
 
-/* Features Section */
-#features {
+/* Sections */
+section {
   padding: 50px 20px;
   text-align: center;
 }
 
-.features-grid {
-  display: flex;
-  justify-content: center;
-  gap: 30px;
-  flex-wrap: wrap;
-  margin-top: 30px;
+textarea, input {
+  width: 60%;
+  padding: 10px;
+  margin: 10px 0;
 }
 
-.feature-card {
-  background: white;
-  border-radius: 10px;
-  padding: 20px;
-  width: 300px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-}
-
-.feature-card h3 {
-  color: #4a90e2;
-  margin-bottom: 15px;
-}
-
-#output-box {
-  background: #f0f4f8;
-  border: 2px solid #4a90e2;
-  border-radius: 10px;
-  padding: 20px;
-  min-height: 50px;
-}
-
-/* Speak Button */
-.speak-btn {
-  margin-top: 15px;
+button {
+  padding: 10px 20px;
   background: #4a90e2;
   color: white;
-  padding: 10px 20px;
-  border-radius: 8px;
   border: none;
-  font-size: 1em;
+  border-radius: 5px;
   cursor: pointer;
-  transition: background 0.3s;
 }
 
-.speak-btn:hover {
+button:hover {
   background: #357ab8;
+}
+
+#stt-output, #sign-output, #sign-display {
+  margin-top: 20px;
+  padding: 15px;
+  border: 2px solid #4a90e2;
+  border-radius: 8px;
+  background: #fff;
 }
 
 /* Donate Section */
 #donate {
-  padding: 50px 20px;
-  text-align: center;
   background: #f4f4f4;
 }
 
