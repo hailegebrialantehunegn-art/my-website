@@ -6,9 +6,6 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <!-- Skip to content -->
-  <a href="#main" class="skip-link">Skip to content</a>
-
   <!-- Language Switcher -->
   <div class="language-switcher">
     <label for="language-select">🌐</label>
@@ -18,13 +15,28 @@
     </select>
   </div>
 
+  <!-- Login -->
+  <section id="login-section">
+    <h1 data-lang-en="Login" data-lang-am="ግባ">Login</h1>
+    <form id="login-form">
+      <label data-lang-en="Username" data-lang-am="የተጠቃሚ ስም">
+        <input type="text" id="username" required>
+      </label>
+      <label data-lang-en="Password" data-lang-am="የይለፍ ቃል">
+        <input type="password" id="password" required>
+      </label>
+      <button type="submit" data-lang-en="Login" data-lang-am="ግባ">Login</button>
+    </form>
+    <p id="login-status"></p>
+  </section>
+
   <!-- Preference Choice -->
-  <section id="preference" aria-labelledby="preference-heading">
-    <h1 id="preference-heading"
+  <section id="preference" hidden>
+    <h2 id="preference-heading"
         data-lang-en="Choose Your Accessibility Mode"
         data-lang-am="አንድ የተደረገ አማራጭ ይምረጡ">
         Choose Your Accessibility Mode
-    </h1>
+    </h2>
     <div class="choice-container">
       <button id="blind-choice" class="choice-btn"
         data-lang-en="👁️ Blind Accessibility"
@@ -39,9 +51,8 @@
     </div>
   </section>
 
-  <!-- Main content hidden until choice -->
+  <!-- Main content -->
   <main id="main" hidden>
-    <!-- Back button -->
     <button id="back-btn" class="back-btn"
       data-lang-en="⬅ Back to Choice"
       data-lang-am="⬅ ወደ አማራጭ ተመለስ">⬅ Back to Choice</button>
@@ -52,10 +63,6 @@
           data-lang-am="ለአይነት የተደረገ ባህሪያት">
           Blind Accessibility Features
       </h2>
-      <p data-lang-en="Includes Text-to-Speech, skip links, keyboard navigation, and focus indicators."
-         data-lang-am="የጽሑፍ ወደ ንግግር፣ የመዝለል አገናኞች፣ የቁልፍ ሰሌዳ አሰሳ፣ እና የትኩረት መለያዎችን ያካትታል።">
-         Includes Text-to-Speech, skip links, keyboard navigation, and focus indicators.
-      </p>
       <textarea id="tts-input" placeholder="Type text here..."></textarea>
       <div class="controls">
         <label>Speed <input type="range" id="tts-rate" min="0.5" max="2" step="0.1" value="1"></label>
@@ -73,10 +80,6 @@
           data-lang-am="ለሰማይ የተደረገ ባህሪያት">
           Deaf Accessibility Features
       </h2>
-      <p data-lang-en="Includes Speech-to-Text, live captions, and transcripts."
-         data-lang-am="የንግግር ወደ ጽሑፍ፣ ቀጥታ አርእስት፣ እና ትርጓሜዎችን ያካትታል።">
-         Includes Speech-to-Text, live captions, and transcripts.
-      </p>
       <button id="stt-start" data-lang-en="Start Speaking" data-lang-am="መናገር ጀምር">Start Speaking</button>
       <button id="stt-stop" data-lang-en="Stop" data-lang-am="አቁም">Stop</button>
       <div id="stt-output" contenteditable="true" aria-live="polite">
@@ -92,7 +95,6 @@
     </p>
   </footer>
 
-  <!-- Scripts -->
   <script src="js/ui.js"></script>
   <script src="js/speech.js"></script>
 </body>
