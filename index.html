@@ -8,61 +8,53 @@
 <body>
   <!-- Language Switcher -->
   <div class="language-switcher">
-    <label for="language-select">🌐</label>
     <select id="language-select">
       <option value="en" selected>English</option>
       <option value="am">አማርኛ</option>
     </select>
   </div>
 
-  <!-- Login -->
+  <!-- Login Section -->
   <section id="login-section">
     <h1 data-lang-en="Login" data-lang-am="ግባ">Login</h1>
     <form id="login-form">
-      <label data-lang-en="Username" data-lang-am="የተጠቃሚ ስም">
-        <input type="text" id="username" required>
-      </label>
-      <label data-lang-en="Password" data-lang-am="የይለፍ ቃል">
-        <input type="password" id="password" required>
-      </label>
+      <input type="text" id="username" placeholder="Username" required>
+      <input type="password" id="password" placeholder="Password" required>
       <button type="submit" data-lang-en="Login" data-lang-am="ግባ">Login</button>
     </form>
     <p id="login-status"></p>
   </section>
 
-  <!-- Preference Choice -->
+  <!-- Accessibility Preference -->
   <section id="preference" hidden>
     <h2 id="preference-heading"
-        data-lang-en="Choose Your Accessibility Mode"
-        data-lang-am="አንድ የተደረገ አማራጭ ይምረጡ">
-        Choose Your Accessibility Mode
-    </h2>
+        data-lang-en="Choose Accessibility Mode"
+        data-lang-am="አማራጭ ይምረጡ">Choose Accessibility Mode</h2>
     <div class="choice-container">
       <button id="blind-choice" class="choice-btn"
         data-lang-en="👁️ Blind Accessibility"
-        data-lang-am="👁️ ለአይነት የተደረገ አገልግሎት">
-        👁️ Blind Accessibility
-      </button>
+        data-lang-am="👁️ ለአይነት አገልግሎት">👁️ Blind Accessibility</button>
       <button id="deaf-choice" class="choice-btn"
         data-lang-en="👂 Deaf Accessibility"
-        data-lang-am="👂 ለሰማይ የተደረገ አገልግሎት">
-        👂 Deaf Accessibility
-      </button>
+        data-lang-am="👂 ለሰማይ አገልግሎት">👂 Deaf Accessibility</button>
     </div>
   </section>
 
-  <!-- Main content -->
+  <!-- Main Content -->
   <main id="main" hidden>
     <button id="back-btn" class="back-btn"
-      data-lang-en="⬅ Back to Choice"
-      data-lang-am="⬅ ወደ አማራጭ ተመለስ">⬅ Back to Choice</button>
+      data-lang-en="⬅ Back"
+      data-lang-am="⬅ ተመለስ">⬅ Back</button>
 
     <!-- Blind Features -->
     <section id="blind-features" hidden>
-      <h2 data-lang-en="Blind Accessibility Features"
-          data-lang-am="ለአይነት የተደረገ ባህሪያት">
-          Blind Accessibility Features
-      </h2>
+      <h2 data-lang-en="Blind Features" data-lang-am="ለአይነት ባህሪያት">Blind Features</h2>
+      <p data-lang-en="Choose Text-to-Speech or Speech-to-Text"
+         data-lang-am="ጽሑፍ ወደ ንግግር ወይም ንግግር ወደ ጽሑፍ ይምረጡ">
+         Choose Text-to-Speech or Speech-to-Text
+      </p>
+
+      <!-- TTS -->
       <textarea id="tts-input" placeholder="Type text here..."></textarea>
       <div class="controls">
         <label>Speed <input type="range" id="tts-rate" min="0.5" max="2" step="0.1" value="1"></label>
@@ -72,26 +64,44 @@
       <button id="tts-play" data-lang-en="Play" data-lang-am="አጫውት">Play</button>
       <button id="tts-pause" data-lang-en="Pause" data-lang-am="አቁም">Pause</button>
       <button id="tts-stop" data-lang-en="Stop" data-lang-am="አቁም">Stop</button>
+
+      <!-- STT -->
+      <h3 data-lang-en="Speech-to-Text" data-lang-am="ንግግር ወደ ጽሑፍ">Speech-to-Text</h3>
+      <button id="stt-start" data-lang-en="Start Speaking" data-lang-am="መናገር ጀምር">Start Speaking</button>
+      <button id="stt-stop" data-lang-en="Stop" data-lang-am="አቁም">Stop</button>
+      <div id="stt-output" contenteditable="true" aria-live="polite">Transcript will appear here...</div>
+
+      <!-- Sign Language -->
+      <h3 data-lang-en="Sign Language Translation" data-lang-am="የምልክት ቋንቋ ትርጉም">Sign Language Translation</h3>
+      <video id="webcam" autoplay playsinline></video>
+      <div id="sign-output">Sign translation will appear here...</div>
     </section>
 
     <!-- Deaf Features -->
     <section id="deaf-features" hidden>
-      <h2 data-lang-en="Deaf Accessibility Features"
-          data-lang-am="ለሰማይ የተደረገ ባህሪያት">
-          Deaf Accessibility Features
-      </h2>
-      <button id="stt-start" data-lang-en="Start Speaking" data-lang-am="መናገር ጀምር">Start Speaking</button>
-      <button id="stt-stop" data-lang-en="Stop" data-lang-am="አቁም">Stop</button>
-      <div id="stt-output" contenteditable="true" aria-live="polite">
-        Transcript will appear here...
-      </div>
+      <h2 data-lang-en="Deaf Features" data-lang-am="ለሰማይ ባህሪያት">Deaf Features</h2>
+      <button id="stt-start-deaf" data-lang-en="Start Speaking" data-lang-am="መናገር ጀምር">Start Speaking</button>
+      <button id="stt-stop-deaf" data-lang-en="Stop" data-lang-am="አቁም">Stop</button>
+      <div id="stt-output-deaf" contenteditable="true" aria-live="polite">Transcript will appear here...</div>
     </section>
   </main>
 
+  <!-- About Us -->
+  <section id="about">
+    <h2 data-lang-en="About Us" data-lang-am="ስለ እኛ">About Us</h2>
+    <p data-lang-en="This website was created by Haile Gebrial Antehunegn to support accessibility and Mekedonia."
+       data-lang-am="ይህ ድረ-ገጽ በሀይሌ ገብርኤል አንተሁንኝ ተፈጥሯል ለተደራሽነት እና ሜከዶኒያን ለመደገፍ።">
+       This website was created by Haile Gebrial Antehunegn to support accessibility and Mekedonia.
+    </p>
+    <a href="https://www.gofundme.com/f/mekedonia" target="_blank"
+       class="support-btn" data-lang-en="Support Mekedonia" data-lang-am="ሜከዶኒያን ይደግፉ">Support Mekedonia</a>
+  </section>
+
+  <!-- Footer -->
   <footer>
-    <p data-lang-en="© 2026 Haile | Accessibility for All"
-       data-lang-am="© 2026 ሀይሌ | ለሁሉም ተደራሽነት">
-       © 2026 Haile | Accessibility for All
+    <p data-lang-en="© 2026 Haile Gebrial Antehunegn | Accessibility for All"
+       data-lang-am="© 2026 ሀይሌ ገብርኤል አንተሁንኝ | ለሁሉም ተደራሽነት">
+       © 2026 Haile Gebrial Antehunegn | Accessibility for All
     </p>
   </footer>
 
