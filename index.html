@@ -2,71 +2,99 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Accessible Sign Language Translator</title>
-  <link rel="stylesheet" href="style.css">
+  <title>Accessible Communication App</title>
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <!-- Navigation Bar -->
-  <nav>
-    <div class="logo">🤟 Translator</div>
-    <ul>
-      <li><a href="#tts">Text → Speech</a></li>
-      <li><a href="#stt">Speech → Text</a></li>
-      <li><a href="#sign-to-text">Sign → Text</a></li>
-      <li><a href="#text-to-sign">Text → Sign</a></li>
-      <li><a href="#donate">Donate</a></li>
-    </ul>
-  </nav>
+  <!-- Skip to content -->
+  <a href="#main" class="skip-link">Skip to content</a>
 
-  <!-- Hero Section -->
-  <header id="home">
-    <h1>Sign Language Translator</h1>
-    <p>Breaking barriers with technology</p>
-    <a href="#donate" class="cta-btn">Support Us</a>
-  </header>
+  <!-- Language Switcher -->
+  <div class="language-switcher">
+    <label for="language-select">🌐</label>
+    <select id="language-select">
+      <option value="en" selected>English</option>
+      <option value="am">አማርኛ</option>
+    </select>
+  </div>
 
-  <!-- Text to Speech -->
-  <section id="tts">
-    <h2>🔊 Text to Speech</h2>
-    <textarea id="tts-input" placeholder="Type text here..."></textarea><br>
-    <button id="tts-btn">Speak</button>
+  <!-- Preference Choice -->
+  <section id="preference" aria-labelledby="preference-heading">
+    <h1 id="preference-heading"
+        data-lang-en="Choose Your Accessibility Mode"
+        data-lang-am="አንድ የተደረገ አማራጭ ይምረጡ">
+        Choose Your Accessibility Mode
+    </h1>
+    <div class="choice-container">
+      <button id="blind-choice" class="choice-btn"
+        data-lang-en="👁️ Blind Accessibility"
+        data-lang-am="👁️ ለአይነት የተደረገ አገልግሎት">
+        👁️ Blind Accessibility
+      </button>
+      <button id="deaf-choice" class="choice-btn"
+        data-lang-en="👂 Deaf Accessibility"
+        data-lang-am="👂 ለሰማይ የተደረገ አገልግሎት">
+        👂 Deaf Accessibility
+      </button>
+    </div>
   </section>
 
-  <!-- Speech to Text -->
-  <section id="stt">
-    <h2>🎤 Speech to Text</h2>
-    <button id="stt-btn">Start Speaking</button>
-    <div id="stt-output">Your speech will appear here...</div>
-  </section>
+  <!-- Main content hidden until choice -->
+  <main id="main" hidden>
+    <!-- Back button -->
+    <button id="back-btn" class="back-btn"
+      data-lang-en="⬅ Back to Choice"
+      data-lang-am="⬅ ወደ አማራጭ ተመለስ">⬅ Back to Choice</button>
 
-  <!-- Sign Language to Text -->
-  <section id="sign-to-text">
-    <h2>✋ Sign Language to Text</h2>
-    <video id="webcam" autoplay playsinline></video>
-    <div id="sign-output">Waiting for gesture...</div>
-  </section>
+    <!-- Blind Features -->
+    <section id="blind-features" hidden>
+      <h2 data-lang-en="Blind Accessibility Features"
+          data-lang-am="ለአይነት የተደረገ ባህሪያት">
+          Blind Accessibility Features
+      </h2>
+      <p data-lang-en="Includes Text-to-Speech, skip links, keyboard navigation, and focus indicators."
+         data-lang-am="የጽሑፍ ወደ ንግግር፣ የመዝለል አገናኞች፣ የቁልፍ ሰሌዳ አሰሳ፣ እና የትኩረት መለያዎችን ያካትታል።">
+         Includes Text-to-Speech, skip links, keyboard navigation, and focus indicators.
+      </p>
+      <textarea id="tts-input" placeholder="Type text here..."></textarea>
+      <div class="controls">
+        <label>Speed <input type="range" id="tts-rate" min="0.5" max="2" step="0.1" value="1"></label>
+        <label>Pitch <input type="range" id="tts-pitch" min="0" max="2" step="0.1" value="1"></label>
+        <label>Volume <input type="range" id="tts-volume" min="0" max="1" step="0.1" value="1"></label>
+      </div>
+      <button id="tts-play" data-lang-en="Play" data-lang-am="አጫውት">Play</button>
+      <button id="tts-pause" data-lang-en="Pause" data-lang-am="አቁም">Pause</button>
+      <button id="tts-stop" data-lang-en="Stop" data-lang-am="አቁም">Stop</button>
+    </section>
 
-  <!-- Text to Sign Language -->
-  <section id="text-to-sign">
-    <h2>📖 Text to Sign Language</h2>
-    <input id="text-sign-input" placeholder="Enter text...">
-    <button id="text-sign-btn">Show Signs</button>
-    <div id="sign-display">Signs will appear here...</div>
-  </section>
+    <!-- Deaf Features -->
+    <section id="deaf-features" hidden>
+      <h2 data-lang-en="Deaf Accessibility Features"
+          data-lang-am="ለሰማይ የተደረገ ባህሪያት">
+          Deaf Accessibility Features
+      </h2>
+      <p data-lang-en="Includes Speech-to-Text, live captions, and transcripts."
+         data-lang-am="የንግግር ወደ ጽሑፍ፣ ቀጥታ አርእስት፣ እና ትርጓሜዎችን ያካትታል።">
+         Includes Speech-to-Text, live captions, and transcripts.
+      </p>
+      <button id="stt-start" data-lang-en="Start Speaking" data-lang-am="መናገር ጀምር">Start Speaking</button>
+      <button id="stt-stop" data-lang-en="Stop" data-lang-am="አቁም">Stop</button>
+      <div id="stt-output" contenteditable="true" aria-live="polite">
+        Transcript will appear here...
+      </div>
+    </section>
+  </main>
 
-  <!-- Donate Section -->
-  <section id="donate">
-    <h2>💖 Support the Project</h2>
-    <p>Your donation helps us improve accessibility and reach more people.</p>
-    <a href="https://www.gofundme.com/" target="_blank" class="donate-btn">Donate Now</a>
-  </section>
-
-  <!-- Footer -->
   <footer>
-    <p>© 2026 Haile | Accessibility for All</p>
+    <p data-lang-en="© 2026 Haile | Accessibility for All"
+       data-lang-am="© 2026 ሀይሌ | ለሁሉም ተደራሽነት">
+       © 2026 Haile | Accessibility for All
+    </p>
   </footer>
 
-  <script src="script.js"></script>
+  <!-- Scripts -->
+  <script src="js/ui.js"></script>
+  <script src="js/speech.js"></script>
 </body>
 </html>
 
