@@ -1,140 +1,75 @@
-/* General Reset */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
 body {
-  font-family: 'Segoe UI', Arial, sans-serif;
+  font-family: Arial, sans-serif;
+  line-height: 1.6;
   background: #f9f9f9;
   color: #333;
-  line-height: 1.6;
 }
 
-/* Navigation Bar */
-nav {
+.language-switcher {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  background: #eee;
+  padding: 5px 10px;
+  border-radius: 5px;
+}
+
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: #000;
+  color: #fff;
+  padding: 8px;
+}
+.skip-link:focus {
+  top: 0;
+}
+
+.choice-container {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: #4a90e2;
-  padding: 15px 30px;
-  color: white;
+  justify-content: center;
+  gap: 40px;
+  margin: 50px 0;
 }
 
-nav .logo {
-  font-size: 1.5em;
-  font-weight: bold;
-}
-
-nav ul {
-  list-style: none;
-  display: flex;
-}
-
-nav ul li {
-  margin-left: 20px;
-}
-
-nav ul li a {
-  color: white;
-  text-decoration: none;
-  font-weight: bold;
-}
-
-nav ul li a:hover {
-  text-decoration: underline;
-}
-
-/* Hero Section */
-header {
-  text-align: center;
-  padding: 80px 20px;
-  background: linear-gradient(to right, #4a90e2, #50c9c3);
-  color: white;
-}
-
-header h1 {
-  font-size: 3em;
-  margin-bottom: 20px;
-}
-
-header p {
+.choice-btn {
+  padding: 20px 40px;
   font-size: 1.2em;
-  margin-bottom: 30px;
+  border: 2px solid #4a90e2;
+  border-radius: 10px;
+  background: #f0f4f8;
+  cursor: pointer;
+  transition: background 0.3s, transform 0.2s;
 }
 
-.cta-btn {
-  background: #e94e77;
-  color: white;
-  padding: 12px 25px;
-  border-radius: 8px;
-  text-decoration: none;
-  font-weight: bold;
-  transition: background 0.3s;
-}
-
-.cta-btn:hover {
-  background: #d43f67;
-}
-
-/* Sections */
-section {
-  padding: 50px 20px;
-  text-align: center;
-}
-
-textarea, input {
-  width: 60%;
-  padding: 10px;
-  margin: 10px 0;
-}
-
-button {
-  padding: 10px 20px;
+.choice-btn:hover,
+.choice-btn:focus {
   background: #4a90e2;
+  color: white;
+  transform: scale(1.05);
+  outline: none;
+}
+
+.controls {
+  margin: 15px 0;
+}
+
+button, input, textarea {
+  margin: 5px;
+  padding: 10px;
+}
+
+.back-btn {
+  margin: 20px;
+  padding: 10px 20px;
+  background: #e94e77;
   color: white;
   border: none;
   border-radius: 5px;
   cursor: pointer;
 }
-
-button:hover {
-  background: #357ab8;
-}
-
-#stt-output, #sign-output, #sign-display {
-  margin-top: 20px;
-  padding: 15px;
-  border: 2px solid #4a90e2;
-  border-radius: 8px;
-  background: #fff;
-}
-
-/* Donate Section */
-#donate {
-  background: #f4f4f4;
-}
-
-.donate-btn {
-  display: inline-block;
-  background: #e94e77;
-  color: white;
-  padding: 12px 25px;
-  border-radius: 8px;
-  text-decoration: none;
-  font-weight: bold;
-  transition: background 0.3s;
-}
-
-.donate-btn:hover {
+.back-btn:hover {
   background: #d43f67;
 }
 
-/* Footer */
-footer {
-  background: #333;
-  color: white;
-  text-align: center;
-  padding: 20px;
-}
