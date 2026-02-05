@@ -1,18 +1,17 @@
 // ===== Text-to-Speech (TTS) =====
 let utterance;
 
-// Play TTS
 document.getElementById("tts-play").addEventListener("click", () => {
   const text = document.getElementById("tts-input").value;
   if (!text.trim()) return;
 
   utterance = new SpeechSynthesisUtterance(text);
 
-  // Get chosen language from selector
+  // Get chosen language from localStorage
   const lang = localStorage.getItem("language") || "en";
   utterance.lang = lang === "am" ? "am-ET" : "en-US";
 
-  // Apply controls
+  // Apply user controls
   utterance.rate = document.getElementById("tts-rate").value;
   utterance.pitch = document.getElementById("tts-pitch").value;
   utterance.volume = document.getElementById("tts-volume").value;
@@ -20,12 +19,10 @@ document.getElementById("tts-play").addEventListener("click", () => {
   speechSynthesis.speak(utterance);
 });
 
-// Pause TTS
 document.getElementById("tts-pause").addEventListener("click", () => {
   if (speechSynthesis.speaking) speechSynthesis.pause();
 });
 
-// Stop TTS
 document.getElementById("tts-stop").addEventListener("click", () => {
   if (speechSynthesis.speaking) speechSynthesis.cancel();
 });
@@ -44,7 +41,6 @@ if (SpeechRecognition) {
     recognition.lang = lang === "am" ? "am-ET" : "en-US";
   }
 
-  // Update transcript
   recognition.onresult = (event) => {
     const transcript = Array.from(event.results)
       .map(result => result[0].transcript)
@@ -53,14 +49,12 @@ if (SpeechRecognition) {
     localStorage.setItem("transcript", transcript); // store locally
   };
 
-  // Start STT
   document.getElementById("stt-start").addEventListener("click", () => {
     setRecognitionLang();
     recognition.start();
   });
 
-  // Stop STT
   document.getElementById("stt-stop").addEventListener("click", () => recognition.stop());
 } else {
-  document.getElementById("stt-output").innerText = "Speech recognition not supported in this browser.";
+  document.getElementById("stt-output").innerText = "❌ Speech recognition not supported in this browser.";
 }
