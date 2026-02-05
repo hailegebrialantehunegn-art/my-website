@@ -1,35 +1,161 @@
-/* General page styling */
-body {
-  font-family: Arial, sans-serif;
-  background-color: #f4f4f4;
-  text-align: center;
+/* General Reset */
+* {
   margin: 0;
-  padding: 20px;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-/* Title */
-h1 {
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: #f9f9f9;
   color: #333;
-  margin-bottom: 20px;
+  line-height: 1.6;
 }
 
-/* Webcam video */
-video {
-  width: 400px;
-  border: 2px solid #333;
-  margin: 20px 0;
-  border-radius: 8px;
+/* Navigation Bar */
+nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #4a90e2;
+  padding: 15px 30px;
+  color: white;
 }
 
-/* Translation text */
-#output {
-  font-size: 20px;
-  margin: 15px 0;
-  color: #007bff;
+nav .logo {
+  font-size: 1.5em;
   font-weight: bold;
 }
 
-/* GoFundMe button */
-a {
+nav ul {
+  list-style: none;
+  display: flex;
+}
+
+nav ul li {
+  margin-left: 20px;
+}
+
+nav ul li a {
+  color: white;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+nav ul li a:hover {
+  text-decoration: underline;
+}
+
+/* Hero Section */
+header {
+  text-align: center;
+  padding: 80px 20px;
+  background: linear-gradient(to right, #4a90e2, #50c9c3);
+  color: white;
+}
+
+header h1 {
+  font-size: 3em;
+  margin-bottom: 20px;
+}
+
+header p {
+  font-size: 1.2em;
+  margin-bottom: 30px;
+}
+
+.cta-btn {
+  background: #e94e77;
+  color: white;
+  padding: 12px 25px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: bold;
+  transition: background 0.3s;
+}
+
+.cta-btn:hover {
+  background: #d43f67;
+}
+
+/* Features Section */
+#features {
+  padding: 50px 20px;
+  text-align: center;
+}
+
+.features-grid {
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+  flex-wrap: wrap;
+  margin-top: 30px;
+}
+
+.feature-card {
+  background: white;
+  border-radius: 10px;
+  padding: 20px;
+  width: 300px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.feature-card h3 {
+  color: #4a90e2;
+  margin-bottom: 15px;
+}
+
+#output-box {
+  background: #f0f4f8;
+  border: 2px solid #4a90e2;
+  border-radius: 10px;
+  padding: 20px;
+  min-height: 50px;
+}
+
+/* Speak Button */
+.speak-btn {
+  margin-top: 15px;
+  background: #4a90e2;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  font-size: 1em;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.speak-btn:hover {
+  background: #357ab8;
+}
+
+/* Donate Section */
+#donate {
+  padding: 50px 20px;
+  text-align: center;
+  background: #f4f4f4;
+}
+
+.donate-btn {
   display: inline-block;
-  margin-top: 20
+  background: #e94e77;
+  color: white;
+  padding: 12px 25px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: bold;
+  transition: background 0.3s;
+}
+
+.donate-btn:hover {
+  background: #d43f67;
+}
+
+/* Footer */
+footer {
+  background: #333;
+  color: white;
+  text-align: center;
+  padding: 20px;
+}
