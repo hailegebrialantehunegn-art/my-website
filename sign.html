@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sign Language Translator</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      color: #333;
+    }
+    video {
+      width: 400px;
+      border: 2px solid #333;
+      margin: 20px 0;
+    }
+    #output {
+      font-size: 20px;
+      margin: 15px 0;
+      color: #007bff;
+    }
+    a {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 10px 15px;
+      background-color: #007bff;
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+    }
+    a:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <h1>Sign Language to Text Translator</h1>
+
+  <!-- Webcam video -->
+  <video id="webcam" autoplay playsinline></video>
+
+  <!-- Translation output -->
+  <p id="output">Translation will appear here...</p>
+
+  <!-- GoFundMe link -->
+  <a href="https://www.gofundme.com/f/your-campaign-link" target="_blank">
+    Support Mekedonia on GoFundMe
+  </a>
+
+  <script>
+    // Access webcam
+    const video = document.getElementById('webcam');
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        video.srcObject = stream;
+      })
+      .catch(err => {
+        console.error("Error accessing webcam:", err);
+      });
+
+    // Placeholder translation logic
+    // Later you can connect this to a real ML model
+    document.getElementById('output').innerText = "Waiting for sign input...";
+  </script>
+</body>
+</html>
