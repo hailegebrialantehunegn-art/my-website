@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Sign Language Translator</title>
+  <title>Accessible Sign Language Translator</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -10,8 +10,10 @@
   <nav>
     <div class="logo">🤟 Translator</div>
     <ul>
-      <li><a href="#home">Home</a></li>
-      <li><a href="#features">Features</a></li>
+      <li><a href="#tts">Text → Speech</a></li>
+      <li><a href="#stt">Speech → Text</a></li>
+      <li><a href="#sign-to-text">Sign → Text</a></li>
+      <li><a href="#text-to-sign">Text → Sign</a></li>
       <li><a href="#donate">Donate</a></li>
     </ul>
   </nav>
@@ -23,24 +25,33 @@
     <a href="#donate" class="cta-btn">Support Us</a>
   </header>
 
-  <!-- Features Section -->
-  <section id="features">
-    <h2>🌟 Features</h2>
-    <div class="features-grid">
-      <div class="feature-card">
-        <h3>Live Webcam</h3>
-        <video id="webcam" autoplay playsinline></video>
-      </div>
-      <div class="feature-card">
-        <h3>Instant Translation</h3>
-        <div id="output-box">Waiting for gestures...</div>
-        <button id="speak-btn" class="speak-btn">🔊 Speak</button>
-      </div>
-      <div class="feature-card">
-        <h3>Accessible Design</h3>
-        <p>Includes text-to-speech for blind users.</p>
-      </div>
-    </div>
+  <!-- Text to Speech -->
+  <section id="tts">
+    <h2>🔊 Text to Speech</h2>
+    <textarea id="tts-input" placeholder="Type text here..."></textarea><br>
+    <button id="tts-btn">Speak</button>
+  </section>
+
+  <!-- Speech to Text -->
+  <section id="stt">
+    <h2>🎤 Speech to Text</h2>
+    <button id="stt-btn">Start Speaking</button>
+    <div id="stt-output">Your speech will appear here...</div>
+  </section>
+
+  <!-- Sign Language to Text -->
+  <section id="sign-to-text">
+    <h2>✋ Sign Language to Text</h2>
+    <video id="webcam" autoplay playsinline></video>
+    <div id="sign-output">Waiting for gesture...</div>
+  </section>
+
+  <!-- Text to Sign Language -->
+  <section id="text-to-sign">
+    <h2>📖 Text to Sign Language</h2>
+    <input id="text-sign-input" placeholder="Enter text...">
+    <button id="text-sign-btn">Show Signs</button>
+    <div id="sign-display">Signs will appear here...</div>
   </section>
 
   <!-- Donate Section -->
@@ -52,7 +63,7 @@
 
   <!-- Footer -->
   <footer>
-    <p>© 2026 Haile | Made with ❤️</p>
+    <p>© 2026 Haile | Accessibility for All</p>
   </footer>
 
   <script src="script.js"></script>
