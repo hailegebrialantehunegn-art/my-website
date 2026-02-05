@@ -1,16 +1,15 @@
-// Get video element
-const video = document.getElementById('webcam');
+// Text-to-Speech for blind users
+document.getElementById("speak-btn").addEventListener("click", () => {
+  const text = document.getElementById("output-box").innerText;
+  if (text.trim() !== "") {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "en-US"; // Change language if needed
+    speechSynthesis.speak(utterance);
+  }
+});
 
-// Ask for webcam access
-navigator.mediaDevices.getUserMedia({ video: true })
-  .then(stream => {
-    video.srcObject = stream;
-  })
-  .catch(err => {
-    console.error("Error accessing webcam:", err);
-  });
+// Placeholder for future gesture recognition
+// Later you can integrate MediaPipe Hands or TensorFlow.js here
+// Example: update output-box with recognized gesture
+// document.getElementById("output-box").innerText = "Hello";
 
-// Placeholder translation logic
-// Later you can connect this to a real ML model
-const output = document.getElementById('output');
-output.innerText = "Waiting for sign input...";
