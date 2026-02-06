@@ -1,100 +1,114 @@
+<!-- =====================
+index.html
+===================== -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Accessibility Hub</title>
-  <link rel="stylesheet" href="css/style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Accessible Website</title>
+  <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
-  <!-- Language Switcher -->
-  <div class="language-switcher">
-    <select id="language-select">
-      <option value="en" selected>English</option>
-      <option value="am">አማርኛ</option>
-    </select>
-  </div>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="nav-left">
+      <span id="site-title">Accessible Web</span>
+    </div>
+    <div class="nav-right">
+      <button class="lang-btn" onclick="setLanguage('en')">English</button>
+      <button class="lang-btn" onclick="setLanguage('am')">አማርኛ</button>
+    </div>
+  </nav>
 
   <!-- Hero Section -->
-  <section id="home">
-    <h1 data-lang-en="Welcome to Accessibility Hub"
-        data-lang-am="እንኳን ወደ ተደራሽነት ማዕከል በደህና መጡ">
-        Welcome to Accessibility Hub
-    </h1>
-    <p data-lang-en="Choose your language and accessibility mode"
-       data-lang-am="ቋንቋዎን እና የተደራሽነት ሁኔታዎን ይምረጡ">
-       Choose your language and accessibility mode
-    </p>
-    <button class="hero-btn" data-lang-en="Get Started 🚀" data-lang-am="ጀምር 🚀">Get Started 🚀</button>
-  </section>
-
-  <!-- Login Section -->
-  <section id="login-section" style="display:none;">
-    <h2 data-lang-en="Login" data-lang-am="ግባ">Login</h2>
-    <form id="login-form">
-      <input type="text" id="username" placeholder="Email" required>
-      <input type="password" id="password" placeholder="Password" required>
-      <button type="submit" class="primary-btn" data-lang-en="Login" data-lang-am="ግባ">Login</button>
-    </form>
-    <p id="login-status"></p>
-    <small id="signup-link" hidden>
-      <a href="#" class="secondary-btn" data-lang-en="Sign up (maybe later)" data-lang-am="መመዝገብ (በኋላ)">Sign up (maybe later)</a>
-    </small>
-  </section>
-
-  <!-- Preference -->
-  <section id="preference" style="display:none;">
-    <h2 data-lang-en="Choose Accessibility Mode" data-lang-am="አማራጭ ይምረጡ">Choose Accessibility Mode</h2>
-    <div class="choice-container">
-      <button id="blind-choice" class="choice-btn" data-lang-en="👁️ Blind Accessibility" data-lang-am="👁️ ለአይነት አገልግሎት">👁️ Blind Accessibility</button>
-      <button id="deaf-choice" class="choice-btn" data-lang-en="👂 Deaf Accessibility" data-lang-am="👂 ለሰማይ አገልግሎት">👂 Deaf Accessibility</button>
+  <section id="home" class="section active">
+    <div class="hero">
+      <h1 id="hero-title">Welcome to Accessible Web</h1>
+      <p id="hero-subtitle">Choose your path to accessibility</p>
+      <div class="cta-buttons">
+        <button class="btn ripple" onclick="openModal('login')"
+          id="login-btn">Login</button>
+        <button class="btn ripple" onclick="openModal('signup')"
+          id="signup-btn">Sign Up</button>
+        <button class="btn ripple" onclick="navigate('accessibility')"
+          id="guest-btn">Continue as Guest</button>
+        <button class="btn ripple glow" onclick="openDonate()"
+          id="donate-btn">Donate</button>
+      </div>
     </div>
   </section>
 
-  <!-- Main -->
-  <main id="main" style="display:none;">
-    <button id="back-btn" class="back-btn" data-lang-en="⬅ Back" data-lang-am="⬅ ተመለስ">⬅ Back</button>
-
-    <!-- Blind Features -->
-    <section id="blind-features" style="display:none;">
-      <h2>Blind Features</h2>
-      <textarea id="tts-input" placeholder="Type text here..."></textarea>
-      <div class="controls">
-        <label>Speed <input type="range" id="tts-rate" min="0.5" max="2" step="0.1" value="1"></label>
-        <label>Pitch <input type="range" id="tts-pitch" min="0" max="2" step="0.1" value="1"></label>
-        <label>Volume <input type="range" id="tts-volume" min="0" max="1" step="0.1" value="1"></label>
-      </div>
-      <button id="tts-play">Play</button>
-      <button id="tts-pause">Pause</button>
-      <button id="tts-stop">Stop</button>
-
-      <h3>Speech-to-Text</h3>
-      <button id="stt-start">Start Speaking</button>
-      <button id="stt-stop">Stop</button>
-      <div id="stt-output" contenteditable="true">Transcript will appear here...</div>
-
-      <h3>Sign Language Translation</h3>
-      <div id="sign-output">Sign translation will appear here...</div>
-    </section>
-
-    <!-- Deaf Features -->
-    <section id="deaf-features" style="display:none;">
-      <h2>Deaf Features</h2>
-      <button id="stt-start-deaf">Start Speaking</button>
-      <button id="stt-stop-deaf">Stop</button>
-      <div id="stt-output-deaf" contenteditable="true">Transcript will appear here...</div>
-    </section>
-  </main>
-
-  <!-- About Us -->
-  <section id="about">
-    <h2>About Us</h2>
-    <p>This website was created by Haile Gebrial Antehunegn to support accessibility and Mekedonia.</p>
-    <a href="https://www.gofundme.com/f/mekedonia" target="_blank" class="support-btn">Support Mekedonia</a>
+  <!-- Accessibility Choice -->
+  <section id="accessibility" class="section">
+    <h2 id="accessibility-title">Choose Accessibility Option</h2>
+    <div class="choice-buttons">
+      <button class="btn large ripple" onclick="navigate('blind')"
+        id="blind-btn">Blind</button>
+      <button class="btn large ripple" onclick="navigate('deaf')"
+        id="deaf-btn">Deaf</button>
+    </div>
+    <button class="back-btn" onclick="navigate('home')" id="back-btn1">Back</button>
   </section>
 
-  <!-- Scripts -->
-  <script src="js/ui.js"></script>
-  <script src="js/speech.js"></script>
+  <!-- Blind Flow -->
+  <section id="blind" class="section">
+    <h2 id="blind-title">Blind Accessibility</h2>
+    <div class="choice-buttons">
+      <button class="btn large ripple" onclick="startSpeechToText()"
+        id="stt-btn">Speech to Text</button>
+      <button class="btn large ripple" onclick="startTextToSpeech()"
+        id="tts-btn">Text to Speech</button>
+    </div>
+    <textarea id="speech-output" placeholder="Speech/Text output here"></textarea>
+    <button class="back-btn" onclick="navigate('accessibility')" id="back-btn2">Back</button>
+  </section>
+
+  <!-- Deaf Flow -->
+  <section id="deaf" class="section">
+    <h2 id="deaf-title">Deaf Accessibility</h2>
+    <div class="choice-buttons">
+      <button class="btn large ripple" onclick="signToSpeech()" id="sign-btn">Sign to Speech</button>
+      <button class="btn large ripple" onclick="speechToSign()" id="speech-sign-btn">Speech to Sign</button>
+    </div>
+    <div id="sign-output" class="sign-box"></div>
+    <button class="back-btn" onclick="navigate('accessibility')" id="back-btn3">Back</button>
+  </section>
+
+  <!-- Login Modal -->
+  <div id="login-modal" class="modal">
+    <div class="modal-content glass">
+      <span class="close" onclick="closeModal('login')">&times;</span>
+      <h2 id="login-title">Login</h2>
+      <form onsubmit="validateLogin(event)">
+        <input type="text" id="login-username" placeholder="Username" required/>
+        <input type="password" id="login-password" placeholder="Password" required/>
+        <button type="submit" class="btn ripple" id="login-submit">Login</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Signup Modal -->
+  <div id="signup-modal" class="modal">
+    <div class="modal-content glass">
+      <span class="close" onclick="closeModal('signup')">&times;</span>
+      <h2 id="signup-title">Sign Up</h2>
+      <form onsubmit="validateSignup(event)">
+        <input type="text" id="signup-username" placeholder="Username" required/>
+        <input type="email" id="signup-email" placeholder="Email" required/>
+        <input type="password" id="signup-password" placeholder="Password" required/>
+        <button type="submit" class="btn ripple" id="signup-submit">Sign Up</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Reminder Popup -->
+  <div id="reminder-popup" class="popup glass">
+    <p id="reminder-text">Please log in to continue</p>
+    <button class="btn ripple" onclick="closeReminder()" id="reminder-close">Close</button>
+  </div>
+
+  <script src="script.js"></script>
 </body>
 </html>
 
