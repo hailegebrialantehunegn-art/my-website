@@ -1,13 +1,14 @@
 /* style.css
    AccessFirst — Accessible, responsive, animated UI
-   - Glassmorphism + soft gradients
-   - Focus indicators and keyboard-friendly styles
-   - High-contrast and reduced-motion support
+   - Glassmorphism, soft gradients
+   - Focus indicators, keyboard-first UX
+   - High-contrast & reduced-motion support
+   - Well-commented and production-ready
 */
 
-/* --------------------
-   VARIABLES
-   -------------------- */
+/* ------------------------
+   Variables
+   ------------------------ */
 :root{
   --bg: linear-gradient(135deg,#eef6ff 0%, #fffaf7 100%);
   --card: rgba(255,255,255,0.6);
@@ -24,25 +25,25 @@
   --font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
 }
 
-/* HIGH CONTRAST THEME */
-.high-contrast {
+/* High-contrast theme */
+.high-contrast{
   --bg: linear-gradient(135deg,#000,#0b1120);
   --card: rgba(0,0,0,0.95);
   --glass-border: rgba(255,255,255,0.06);
   --accent: #ffd166;
   --accent-2: #ffb86b;
   --muted: #f0f0f0;
-  --text: #ffffff;
+  --text: #fff;
   --focus: 3px solid #ffd166;
   --shadow: none;
 }
 
-/* REDUCED MOTION */
-.reduced-motion * { transition: none !important; animation: none !important; }
+/* Reduced motion */
+.reduced-motion *{ transition: none !important; animation: none !important; }
 
-/* --------------------
-   BASE
-   -------------------- */
+/* ------------------------
+   Base
+   ------------------------ */
 *{box-sizing:border-box}
 html,body{height:100%}
 body{
@@ -57,9 +58,12 @@ body{
   transition: background 360ms ease, color 360ms ease;
 }
 
-/* --------------------
-   HEADER
-   -------------------- */
+/* Accessible visually-hidden */
+.visually-hidden{position:absolute!important;left:-9999px!important;top:auto!important;width:1px;height:1px;overflow:hidden}
+
+/* ------------------------
+   Header
+   ------------------------ */
 .site-header{
   display:flex;align-items:center;justify-content:space-between;padding:0.8rem 1rem;position:sticky;top:0;z-index:60;
   backdrop-filter: blur(10px);
@@ -72,25 +76,27 @@ body{
 .nav-list{list-style:none;margin:0;padding:0;display:flex;gap:0.4rem;align-items:center}
 .nav-btn,.nav-link{background:transparent;border:none;padding:0.45rem 0.6rem;border-radius:8px;color:var(--muted);cursor:pointer;text-decoration:none}
 .nav-btn:hover,.nav-link:hover{color:var(--accent);transform:translateY(-3px)}
-.nav-btn:focus{outline:var(--focus);}
+.nav-btn:focus,.nav-link:focus{outline:var(--focus)}
 
 /* Preferences */
 .prefs{display:flex;gap:0.5rem;align-items:center}
 .pref{display:flex;align-items:center;gap:0.3rem;color:var(--muted)}
 .pref select{padding:0.25rem;border-radius:6px}
 
-/* --------------------
-   MAIN LAYOUT
-   -------------------- */
+/* ------------------------
+   Main
+   ------------------------ */
 .main{max-width:1100px;margin:1rem auto;padding:0 1rem}
 .page{display:none;opacity:0;transform:translateY(8px);transition:opacity 420ms ease, transform 420ms ease}
 .page--active{display:block;opacity:1;transform:none}
 
-/* GLASS STYLES */
+/* Glass card */
 .glass{padding:1.2rem;border-radius:16px;background:var(--card);border:1px solid var(--glass-border);backdrop-filter: blur(8px);box-shadow:var(--shadow)}
 .glass-panel{padding:0.9rem;border-radius:12px;background:var(--card);border:1px solid var(--glass-border);backdrop-filter: blur(6px)}
 
-/* HERO */
+/* ------------------------
+   Hero
+   ------------------------ */
 .hero{display:grid;grid-template-columns:1fr 360px;gap:1rem;align-items:start}
 .hero-left h2{margin:0 0 0.4rem 0}
 .lead{color:var(--muted);margin:0 0 0.8rem 0}
@@ -106,31 +112,24 @@ body{
 .small{font-size:0.9rem}
 .muted{color:var(--muted)}
 
-/* HERO RIGHT */
-.hero-right{display:flex;flex-direction:column;gap:0.6rem;min-height:200px}
+/* textarea */
 textarea{width:100%;padding:0.6rem;border-radius:8px;border:1px solid rgba(0,0,0,0.06);resize:vertical}
 
-/* FEATURES */
-.features ul{margin:0;padding-left:1rem}
-
-/* CHOICES */
+/* ------------------------
+   Choices / Panels
+   ------------------------ */
 .choices{display:flex;gap:1rem;justify-content:center;margin-top:1rem}
 .choice{flex:1 1 220px;min-width:200px;padding:1rem;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,0.6),rgba(255,255,255,0.45));border:1px solid rgba(0,0,0,0.04);display:flex;flex-direction:column;align-items:center;gap:0.4rem;cursor:pointer;transition:transform 260ms}
 .choice:hover{transform:translateY(-8px);box-shadow:0 14px 40px rgba(20,30,80,0.06)}
 .choice:focus{outline:var(--focus)}
 .emoji{font-size:1.8rem}
 
-/* PANELS & TOOLS */
-.panel{padding:1rem;border-radius:12px;background:var(--card);border:1px solid var(--glass-border);backdrop-filter: blur(6px);box-shadow:var(--shadow)}
+/* split grid */
 .split{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
 .tool{padding:0.8rem;border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,0.6),rgba(255,255,255,0.5));border:1px solid rgba(0,0,0,0.04)}
 .tool-actions{display:flex;gap:0.6rem;flex-wrap:wrap;margin-top:0.6rem}
 
-/* HISTORY */
-.history ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:0.4rem;max-height:220px;overflow:auto}
-.history li{padding:0.45rem;border-radius:8px;background:rgba(255,255,255,0.6);border:1px solid rgba(0,0,0,0.04)}
-
-/* DEAF: signs & camera */
+/* sign palette & camera */
 .sign-palette{display:flex;gap:0.5rem;flex-wrap:wrap}
 .sign-btn{padding:0.45rem 0.6rem;border-radius:8px;border:1px solid rgba(0,0,0,0.06);background:rgba(255,255,255,0.6);cursor:pointer}
 .sign-btn:focus{outline:var(--focus);transform:translateY(-4px)}
@@ -140,17 +139,14 @@ textarea{width:100%;padding:0.6rem;border-radius:8px;border:1px solid rgba(0,0,0
 #camera-canvas{position:absolute;left:0;top:0;width:100%;height:100%}
 .detected-sign{margin-top:0.6rem;padding:0.5rem;border-radius:8px;background:rgba(255,255,255,0.6);border:1px solid rgba(0,0,0,0.04);font-weight:600}
 
-/* MODAL */
+/* modal */
 dialog.modal{border:none;border-radius:12px;padding:1rem;background:linear-gradient(180deg,#fff,#fbfbff);box-shadow:0 16px 60px rgba(12,20,60,0.12)}
 .modal-form{display:flex;flex-direction:column;gap:0.6rem}
 .social{padding:0.45rem 0.6rem;border-radius:8px;border:1px solid rgba(0,0,0,0.06);background:rgba(255,255,255,0.6);cursor:pointer}
 .social.google{background:linear-gradient(90deg,#fff,#f3f3f3)}
 .social.ms{background:linear-gradient(90deg,#e8f0fe,#dbeafe)}
 
-/* transient banners */
-.transient{opacity:1;transition:opacity 450ms ease}
-
-/* RESPONSIVE */
+/* small responsive */
 @media (max-width:980px){
   .hero{grid-template-columns:1fr}
   .split{grid-template-columns:1fr}
@@ -158,5 +154,5 @@ dialog.modal{border:none;border-radius:12px;padding:1rem;background:linear-gradi
   .main{padding:0 0.8rem}
 }
 
-/* Focus-visible tweaks for keyboard users */
+/* Focus visible */
 :focus{outline-offset:3px}
