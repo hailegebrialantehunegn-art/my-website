@@ -3,54 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Accessibility Hub</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', Arial, sans-serif;
-      background: linear-gradient(135deg, #fdfbfb, #ebedee);
-      color: #333;
-      text-align: center;
-      padding: 50px;
-    }
-    .language-switcher {
-      position: fixed;
-      top: 15px;
-      right: 15px;
-      background: #4a90e2;
-      color: white;
-      padding: 8px 12px;
-      border-radius: 8px;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    }
-    .language-switcher select {
-      background: transparent;
-      border: none;
-      color: white;
-      font-size: 1em;
-      cursor: pointer;
-    }
-    h1 {
-      font-size: 2.2em;
-      margin-bottom: 20px;
-    }
-    p {
-      font-size: 1.2em;
-      margin-bottom: 30px;
-    }
-    button {
-      padding: 12px 24px;
-      border-radius: 25px;
-      font-size: 1.1em;
-      background: linear-gradient(45deg, #ff6f61, #ff9966);
-      color: white;
-      border: none;
-      cursor: pointer;
-      transition: transform 0.3s, background 0.3s;
-    }
-    button:hover {
-      transform: scale(1.05);
-      background: linear-gradient(45deg, #ff9966, #ff6f61);
-    }
-  </style>
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <!-- Language Switcher -->
@@ -62,35 +15,86 @@
   </div>
 
   <!-- Hero Section -->
-  <h1 data-lang-en="Welcome to Accessibility Hub"
-      data-lang-am="እንኳን ወደ ተደራሽነት ማዕከል በደህና መጡ">
-      Welcome to Accessibility Hub
-  </h1>
-  <p data-lang-en="Choose your language and accessibility mode"
-     data-lang-am="ቋንቋዎን እና የተደራሽነት ሁኔታዎን ይምረጡ">
-     Choose your language and accessibility mode
-  </p>
-  <button data-lang-en="Get Started 🚀" data-lang-am="ጀምር 🚀">Get Started 🚀</button>
+  <section id="home">
+    <h1 data-lang-en="Welcome to Accessibility Hub"
+        data-lang-am="እንኳን ወደ ተደራሽነት ማዕከል በደህና መጡ">
+        Welcome to Accessibility Hub
+    </h1>
+    <p data-lang-en="Choose your language and accessibility mode"
+       data-lang-am="ቋንቋዎን እና የተደራሽነት ሁኔታዎን ይምረጡ">
+       Choose your language and accessibility mode
+    </p>
+    <button class="hero-btn" data-lang-en="Get Started 🚀" data-lang-am="ጀምር 🚀">Get Started 🚀</button>
+  </section>
 
-  <script>
-    // ===== Language Switcher =====
-    const langSelect = document.getElementById("language-select");
+  <!-- Login Section -->
+  <section id="login-section" style="display:none;">
+    <h2 data-lang-en="Login" data-lang-am="ግባ">Login</h2>
+    <form id="login-form">
+      <input type="text" id="username" placeholder="Email" required>
+      <input type="password" id="password" placeholder="Password" required>
+      <button type="submit" class="primary-btn" data-lang-en="Login" data-lang-am="ግባ">Login</button>
+    </form>
+    <p id="login-status"></p>
+    <small id="signup-link" hidden>
+      <a href="#" class="secondary-btn" data-lang-en="Sign up (maybe later)" data-lang-am="መመዝገብ (በኋላ)">Sign up (maybe later)</a>
+    </small>
+  </section>
 
-    function updateLanguage(lang) {
-      document.querySelectorAll("[data-lang-en]").forEach(el => {
-        el.innerText = lang === "am" 
-          ? el.getAttribute("data-lang-am") 
-          : el.getAttribute("data-lang-en");
-      });
-      localStorage.setItem("language", lang);
-    }
+  <!-- Preference -->
+  <section id="preference" style="display:none;">
+    <h2 data-lang-en="Choose Accessibility Mode" data-lang-am="አማራጭ ይምረጡ">Choose Accessibility Mode</h2>
+    <div class="choice-container">
+      <button id="blind-choice" class="choice-btn" data-lang-en="👁️ Blind Accessibility" data-lang-am="👁️ ለአይነት አገልግሎት">👁️ Blind Accessibility</button>
+      <button id="deaf-choice" class="choice-btn" data-lang-en="👂 Deaf Accessibility" data-lang-am="👂 ለሰማይ አገልግሎት">👂 Deaf Accessibility</button>
+    </div>
+  </section>
 
-    // Initialize language on page load
-    updateLanguage(localStorage.getItem("language") || "en");
+  <!-- Main -->
+  <main id="main" style="display:none;">
+    <button id="back-btn" class="back-btn" data-lang-en="⬅ Back" data-lang-am="⬅ ተመለስ">⬅ Back</button>
 
-    langSelect.addEventListener("change", e => {
-      updateLanguage(e.target.value);
-    });
-  </script>
+    <!-- Blind Features -->
+    <section id="blind-features" style="display:none;">
+      <h2>Blind Features</h2>
+      <textarea id="tts-input" placeholder="Type text here..."></textarea>
+      <div class="controls">
+        <label>Speed <input type="range" id="tts-rate" min="0.5" max="2" step="0.1" value="1"></label>
+        <label>Pitch <input type="range" id="tts-pitch" min="0" max="2" step="0.1" value="1"></label>
+        <label>Volume <input type="range" id="tts-volume" min="0" max="1" step="0.1" value="1"></label>
+      </div>
+      <button id="tts-play">Play</button>
+      <button id="tts-pause">Pause</button>
+      <button id="tts-stop">Stop</button>
+
+      <h3>Speech-to-Text</h3>
+      <button id="stt-start">Start Speaking</button>
+      <button id="stt-stop">Stop</button>
+      <div id="stt-output" contenteditable="true">Transcript will appear here...</div>
+
+      <h3>Sign Language Translation</h3>
+      <div id="sign-output">Sign translation will appear here...</div>
+    </section>
+
+    <!-- Deaf Features -->
+    <section id="deaf-features" style="display:none;">
+      <h2>Deaf Features</h2>
+      <button id="stt-start-deaf">Start Speaking</button>
+      <button id="stt-stop-deaf">Stop</button>
+      <div id="stt-output-deaf" contenteditable="true">Transcript will appear here...</div>
+    </section>
+  </main>
+
+  <!-- About Us -->
+  <section id="about">
+    <h2>About Us</h2>
+    <p>This website was created by Haile Gebrial Antehunegn to support accessibility and Mekedonia.</p>
+    <a href="https://www.gofundme.com/f/mekedonia" target="_blank" class="support-btn">Support Mekedonia</a>
+  </section>
+
+  <!-- Scripts -->
+  <script src="js/ui.js"></script>
+  <script src="js/speech.js"></script>
 </body>
 </html>
+
