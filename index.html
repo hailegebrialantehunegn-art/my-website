@@ -3,198 +3,229 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AccessFirst — Accessible Demo (Developed by HaileGebriel)</title>
+  <title>AccessFirst — Accessibility Demo (Developed by HaileGebriel)</title>
 
-  <!-- Stylesheet -->
+  <!-- Main stylesheet -->
   <link rel="stylesheet" href="style.css" />
 
-  <!-- TensorFlow.js & Handsign model scripts (CDNs) -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0/dist/tf.min.js" defer></script>
+  <!-- TensorFlow.js & Handsign (per requirements) -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs" defer></script>
   <script src="https://cdn.jsdelivr.net/gh/syauqy/handsign-tensorflow@main/main.js" defer></script>
 
-  <!-- Inline language and preference initializer (prevents flash of default) -->
+  <!-- Inline pref bootstrap to avoid UI flicker -->
   <script>
     (function(){
       try {
-        const prefs = JSON.parse(localStorage.getItem('af_prefs') || '{}');
-        if (prefs && prefs.contrast) document.documentElement.classList.add('high-contrast');
-        if (prefs && prefs.fontSize === 'large') document.documentElement.style.fontSize = '18px';
-        if (prefs && prefs.fontSize === 'small') document.documentElement.style.fontSize = '14px';
-        if (prefs && prefs.reduceMotion) document.documentElement.classList.add('reduced-motion');
+        const p = JSON.parse(localStorage.getItem('af_prefs')||'{}');
+        if (p && p.contrast) document.documentElement.classList.add('high-contrast');
+        if (p && p.fontSize === 'large') document.documentElement.style.fontSize='18px';
+        if (p && p.fontSize === 'small') document.documentElement.style.fontSize='14px';
+        if (p && p.reduceMotion) document.documentElement.classList.add('reduced-motion');
       } catch(e){}
     })();
   </script>
 </head>
 <body>
-  <!-- Skip to main content -->
-  <a class="skip-link" href="#main">Skip to main content</a>
-
   <!-- Header -->
   <header class="site-header" role="banner">
-    <div class="brand">
-      <h1 id="brand-title">AccessFirst</h1>
-      <p class="site-tagline visually-hidden">Accessible demo — Developed by HaileGebriel</p>
+    <div class="brand" aria-hidden="false">
+      <h1 class="site-title">AccessFirst</h1>
+      <p class="site-sub">Accessible experiences for Deaf & Blind — Developed by HaileGebriel</p>
     </div>
 
-    <nav class="primary-nav" role="navigation" aria-label="Primary Navigation">
-      <ul>
+    <nav class="nav" role="navigation" aria-label="Main Navigation">
+      <ul class="nav-list">
         <li><button class="nav-btn" data-target="home" id="nav-home">Home</button></li>
         <li><button class="nav-btn" data-target="access-choice" id="nav-access">Accessibility</button></li>
-        <li><button class="nav-btn" data-modal="login" id="nav-login">Login</button></li>
-        <li><button class="nav-btn" data-modal="signup" id="nav-signup">Sign Up</button></li>
-        <li><button class="nav-btn" id="nav-guest">Continue as Guest</button></li>
-        <li><a class="donate" id="donate-link" href="https://gofundme.com/placeholder" target="_blank" rel="noopener noreferrer">Donate</a></li>
+        <li><button class="nav-btn" id="nav-login" data-modal="login-modal">Login</button></li>
+        <li><button class="nav-btn" id="nav-signup" data-modal="signup-modal">Sign Up</button></li>
+        <li><a class="nav-link donate" id="nav-donate" href="https://www.gofundme.com/f/Mekedonia-Charity-help-build-home-for-the-homeless" target="_blank" rel="noopener noreferrer">Donate</a></li>
+        <li><button class="nav-btn" data-target="about" id="nav-about">About</button></li>
       </ul>
     </nav>
 
-    <div class="header-controls" role="region" aria-label="Preferences">
-      <label for="contrast-toggle" class="visually-hidden">High contrast</label>
-      <input id="contrast-toggle" type="checkbox" aria-label="Toggle high contrast" />
+    <div class="prefs" role="region" aria-label="Preferences">
+      <label class="pref">
+        <input id="contrast-toggle" type="checkbox" aria-label="Toggle high contrast" />
+        <span>Contrast</span>
+      </label>
 
-      <label for="font-size" class="visually-hidden">Font size</label>
-      <select id="font-size" aria-label="Select font size">
-        <option value="small">Small</option>
-        <option value="medium" selected>Medium</option>
-        <option value="large">Large</option>
-      </select>
+      <label class="pref">
+        <span class="pref-label">Font</span>
+        <select id="font-size" aria-label="Font size">
+          <option value="small">A−</option>
+          <option value="medium" selected>A</option>
+          <option value="large">A+</option>
+        </select>
+      </label>
 
-      <label for="reduced-motion" class="visually-hidden">Reduce motion</label>
-      <input id="reduced-motion" type="checkbox" aria-label="Toggle reduced motion" />
+      <label class="pref">
+        <input id="reduce-motion" type="checkbox" aria-label="Reduce motion" />
+        <span>Reduce motion</span>
+      </label>
 
-      <label for="demo-mode" class="visually-hidden">Demo mode</label>
-      <input id="demo-mode" type="checkbox" aria-label="Toggle demo mode" />
+      <label class="pref">
+        <input id="demo-mode" type="checkbox" aria-label="Demo mode" />
+        <span>Demo</span>
+      </label>
     </div>
   </header>
 
   <!-- Main content -->
-  <main id="main" class="container" role="main" tabindex="-1">
+  <main id="main" class="main">
     <!-- HOME -->
-    <section id="home" class="page page-active" aria-labelledby="home-heading">
+    <section id="home" class="page page--active" aria-labelledby="home-title">
       <div class="hero glass">
-        <div class="hero-copy">
-          <h2 id="home-heading">Welcome to AccessFirst</h2>
-          <p class="lead">An accessibility-first interactive demo. Developed by HaileGebriel.</p>
+        <div class="hero-left">
+          <h2 id="home-title">Welcome to AccessFirst</h2>
+          <p class="lead">A privacy-first, accessibility-first demo for people who are Deaf and Blind. Explore voice and sign features — no backend required.</p>
 
           <div class="cta-row">
-            <button class="cta btn-primary" id="cta-start" data-target="access-choice">Get Started</button>
-            <button class="cta btn-ghost" id="cta-guest">Continue as Guest</button>
-            <a class="cta btn-donate" id="cta-donate" href="https://gofundme.com/placeholder" target="_blank" rel="noopener noreferrer">Donate</a>
+            <button class="btn btn-primary" id="cta-get-started" data-target="access-choice">Get Started</button>
+            <button class="btn btn-outline" id="cta-login" data-modal="login-modal">Login</button>
+            <button class="btn btn-ghost" id="cta-signup" data-modal="signup-modal">Sign Up</button>
+            <a class="btn btn-donate" id="cta-donate" href="https://www.gofundme.com/f/Mekedonia-Charity-help-build-home-for-the-homeless" target="_blank" rel="noopener noreferrer">Donate to Mekedonia</a>
+          </div>
+
+          <div class="third-row small muted">
+            <p>Secure local accounts (username/email/password). Demo mode, voice feedback, sign-detection via TensorFlow.js.</p>
           </div>
         </div>
 
-        <div class="hero-panel glass-inner" aria-hidden="false">
-          <h3>Text-to-Speech</h3>
-          <p class="muted">Type text and have it spoken aloud. Works well with keyboard & screen readers.</p>
+        <aside class="hero-right glass" aria-labelledby="tts-title">
+          <h3 id="tts-title">Text-to-Speech</h3>
+          <p class="muted">Type text and press Speak. Useful for screen readers and demos.</p>
 
-          <label for="tts-area" class="visually-hidden">Text to speak</label>
-          <textarea id="tts-area" rows="4" placeholder="Type text to be spoken"></textarea>
-
+          <textarea id="home-tts-input" placeholder="Type something to speak..." rows="5" aria-label="Text to speech input"></textarea>
           <div class="tool-actions">
-            <button class="btn" id="tts-speak">Speak</button>
-            <button class="btn subtle" id="tts-stop">Stop</button>
-            <button class="btn subtle" id="tts-clear">Clear</button>
+            <button class="btn btn-primary" id="home-tts-speak">Speak</button>
+            <button class="btn btn-subtle" id="home-tts-stop">Stop</button>
+            <button class="btn btn-subtle" id="home-tts-clear">Clear</button>
           </div>
-        </div>
+        </aside>
       </div>
 
-      <div class="intro glass-panel">
-        <h3>About</h3>
-        <p>Accessible design, keyboard navigation, speech features, and sign-language demo. <strong>Developed by HaileGebriel</strong>.</p>
-      </div>
+      <section class="features glass-panel" aria-labelledby="features-title">
+        <h3 id="features-title">Features</h3>
+        <ul>
+          <li>Voice-first flow for blind users (Web Speech API)</li>
+          <li>Visual sign-flow for deaf users with real-time camera detection (TensorFlow.js & Handsign)</li>
+          <li>High contrast, font size, reduced motion controls</li>
+          <li>Local authentication (stored securely hashed), simulated third-party logins</li>
+          <li>Donation link to Mekedonia GoFundMe (owner notified)</li>
+        </ul>
+      </section>
     </section>
 
     <!-- ACCESSIBILITY CHOICE -->
-    <section id="access-choice" class="page" aria-labelledby="access-heading" hidden>
-      <div class="panel glass-inner">
-        <button class="btn back" data-target="home">← Back</button>
-        <h2 id="access-heading">Choose accessibility flow</h2>
-        <p class="lead">Pick the experience that best matches your needs.</p>
+    <section id="access-choice" class="page" aria-labelledby="access-title" hidden>
+      <div class="panel glass" role="region">
+        <button class="btn btn-back" data-target="home">← Back</button>
+        <h2 id="access-title">Choose Accessibility Flow</h2>
+        <p class="lead">Pick the experience that best suits you.</p>
 
         <div class="choices">
-          <button class="choice large" id="choose-blind" data-target="blind-flow" aria-describedby="blind-desc">
+          <button class="choice" id="flow-blind" data-target="blind-flow" aria-describedby="blind-desc" title="Blind mode — voice-first">
             <span class="emoji">👁️</span>
             <span>Blind</span>
-            <small id="blind-desc">Voice-first experience</small>
+            <small id="blind-desc">Voice-first interface</small>
           </button>
 
-          <button class="choice large" id="choose-deaf" data-target="deaf-flow" aria-describedby="deaf-desc">
+          <button class="choice" id="flow-deaf" data-target="deaf-flow" aria-describedby="deaf-desc" title="Deaf mode — visual-first">
             <span class="emoji">🤟</span>
             <span>Deaf</span>
-            <small id="deaf-desc">Visual-first sign language</small>
+            <small id="deaf-desc">Sign language & camera detection</small>
           </button>
         </div>
       </div>
     </section>
 
     <!-- BLIND FLOW -->
-    <section id="blind-flow" class="page" aria-labelledby="blind-heading" hidden>
-      <div class="panel glass-inner">
-        <button class="btn back" data-target="access-choice">← Back</button>
-        <h2 id="blind-heading">Blind Mode</h2>
-        <p class="lead">Voice-enabled UI. Use Speech-to-Text or Text-to-Speech.</p>
+    <section id="blind-flow" class="page" aria-labelledby="blind-title" hidden>
+      <div class="panel glass">
+        <button class="btn btn-back" data-target="access-choice">← Back</button>
+        <h2 id="blind-title">Blind Mode</h2>
+        <p class="lead">Accessible voice-first UI. Speak or type — everything speaks back if voice is enabled.</p>
 
-        <div class="blind-tools">
+        <div class="split">
           <div class="tool">
             <h3>Speech-to-Text</h3>
-            <p class="muted">Click listen and speak — recognized text appears below.</p>
-            <textarea id="stt-output" rows="4" placeholder="Recognized speech will appear here" aria-label="Speech to text output"></textarea>
+            <p class="muted">Press Start Listening and speak. Recognized text will appear below.</p>
+            <textarea id="blind-stt-output" rows="5" placeholder="Recognized text..." aria-label="Speech to text output"></textarea>
             <div class="tool-actions">
-              <button class="btn" id="stt-start">Start Listening</button>
-              <button class="btn subtle" id="stt-stop">Stop</button>
-              <button class="btn subtle" id="stt-copy">Copy</button>
+              <button class="btn" id="blind-stt-start">Start Listening</button>
+              <button class="btn btn-subtle" id="blind-stt-stop">Stop</button>
+              <button class="btn btn-subtle" id="blind-stt-copy">Copy</button>
             </div>
           </div>
 
           <div class="tool">
             <h3>Text-to-Speech</h3>
-            <p class="muted">Type text and speak it aloud.</p>
-            <textarea id="blind-tts" rows="4" placeholder="Type to speak" aria-label="Text to speech input"></textarea>
+            <p class="muted">Type text and press Speak.</p>
+
+            <!-- New: Voice feedback toggle for blind users -->
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem;">
+              <label for="blind-voice-toggle" class="muted">Voice feedback</label>
+              <button id="blind-voice-toggle" class="btn btn-subtle" aria-pressed="false">Enable Voice Feedback</button>
+            </div>
+
+            <textarea id="blind-tts-input" rows="5" placeholder="Type to speak..." aria-label="Text to speech input"></textarea>
             <div class="tool-actions">
               <button class="btn" id="blind-tts-speak">Speak</button>
-              <button class="btn subtle" id="blind-tts-stop">Stop</button>
-              <button class="btn subtle" id="blind-tts-clear">Clear</button>
+              <button class="btn btn-subtle" id="blind-tts-stop">Stop</button>
+              <button class="btn btn-subtle" id="blind-tts-clear">Clear</button>
             </div>
           </div>
         </div>
 
-        <div class="history-panel">
+        <div class="history glass-panel" aria-live="polite">
           <h4>Interaction History</h4>
-          <ul id="history-blind" aria-live="polite"></ul>
+          <ul id="history-blind"></ul>
         </div>
       </div>
     </section>
 
     <!-- DEAF FLOW -->
-    <section id="deaf-flow" class="page" aria-labelledby="deaf-heading" hidden>
-      <div class="panel glass-inner">
-        <button class="btn back" data-target="access-choice">← Back</button>
-        <h2 id="deaf-heading">Deaf Mode</h2>
-        <p class="lead">Sign language tools. Real-time camera detection via Handsign (TensorFlow.js).</p>
+    <section id="deaf-flow" class="page" aria-labelledby="deaf-title" hidden>
+      <div class="panel glass">
+        <button class="btn btn-back" data-target="access-choice">← Back</button>
+        <h2 id="deaf-title">Deaf Mode</h2>
+        <p class="lead">Visual-first. Use the sign palette or camera-based detection to create phrases.</p>
 
-        <div class="deaf-grid">
+        <div class="split">
           <div class="tool">
             <h3>Sign-to-Speech</h3>
-            <p class="muted">Select signs to build a phrase and have it spoken.</p>
+            <p class="muted">Click signs to build a phrase. Press Speak to read it aloud.</p>
+
             <div id="sign-palette" class="sign-palette" role="list" aria-label="Sign palette">
-              <!-- buttons populated from JS -->
+              <!-- populated by JS -->
             </div>
 
-            <div class="assembled">
+            <div class="assembled glass">
               <div class="assembled-label">Phrase:</div>
               <div id="assembled-phrase" class="assembled-phrase" aria-live="polite"></div>
             </div>
 
             <div class="tool-actions">
               <button class="btn" id="s2s-speak">Speak Phrase</button>
-              <button class="btn subtle" id="s2s-clear">Clear Phrase</button>
+              <button class="btn btn-subtle" id="s2s-clear">Clear Phrase</button>
             </div>
           </div>
 
           <div class="tool">
-            <h3>Speech-to-Sign (Camera)</h3>
-            <p class="muted">Speak or use the camera for real-time sign detection.</p>
+            <h3>Speech-to-Sign (Camera detection & speech)</h3>
+            <p class="muted">Start the camera and Handsign model will attempt to classify your hand signs in real-time. You can also speak and convert spoken words to visual sign placeholders below.</p>
 
-            <div class="camera-wrap">
+            <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;">
+              <button class="btn" id="deaf-stt-start">Speech-to-Sign (Start)</button>
+              <button class="btn btn-subtle" id="deaf-stt-stop">Stop</button>
+            </div>
+
+            <textarea id="deaf-stt-output" rows="3" placeholder="Recognized speech (will map to signs)..." aria-label="Speech to sign recognized text"></textarea>
+
+            <div id="deaf-stt-signs" class="deaf-stt-signs" aria-live="polite" style="margin-top:0.6rem;"></div>
+
+            <div class="camera-wrap" style="margin-top:0.8rem;">
               <video id="camera-video" autoplay playsinline muted></video>
               <canvas id="camera-canvas" aria-hidden="true"></canvas>
             </div>
@@ -202,82 +233,114 @@
             <div id="detected-sign" class="detected-sign" aria-live="polite">No sign detected</div>
 
             <div class="tool-actions">
-              <button class="btn" id="start-detection">Start Camera Detection</button>
-              <button class="btn subtle" id="stop-detection">Stop Detection</button>
-              <button class="btn subtle" id="speak-detected">Speak Detected</button>
+              <button class="btn" id="start-camera">Start Camera</button>
+              <button class="btn btn-subtle" id="stop-camera">Stop Camera</button>
+              <button class="btn btn-subtle" id="speak-detected">Speak Detected</button>
             </div>
 
-            <div id="camera-status" class="muted small">Camera not started</div>
+            <div id="camera-status" class="muted small">Status: idle</div>
           </div>
         </div>
 
-        <div class="history-panel">
+        <div class="history glass-panel" aria-live="polite">
           <h4>Interaction History</h4>
-          <ul id="history-deaf" aria-live="polite"></ul>
+          <ul id="history-deaf"></ul>
         </div>
+      </div>
+    </section>
+
+    <!-- ABOUT -->
+    <section id="about" class="page" aria-labelledby="about-title" hidden>
+      <div class="panel glass-panel">
+        <button class="btn btn-back" data-target="home">← Back</button>
+        <h2 id="about-title">About AccessFirst</h2>
+
+        <p>This website is designed to demonstrate accessibility-first front-end interactions for people who are Blind or Deaf. It uses browser-native speech APIs for Text-to-Speech and Speech-to-Text and integrates TensorFlow.js / Handsign for real-time hand-sign detection using the camera.</p>
+
+        <h3>Mekedonia Charity</h3>
+        <p>Mekedonia supports the homeless and vulnerable. Donations from this site go to Mekedonia via GoFundMe. You can donate using the Donate button — the site will note it and notify the site owner that the donation was made through this website.</p>
+
+        <h3>Target Audience</h3>
+        <p>Blind users get voice-first interactions and voice feedback; Deaf users get visual-first sign representations and camera-based detection to help communicate.</p>
+
+        <footer class="about-footer">
+          <p>Developed by HaileGebriel</p>
+        </footer>
       </div>
     </section>
   </main>
 
-  <!-- Login Modal -->
-  <dialog id="login-modal" aria-labelledby="login-title">
-    <form method="dialog" class="modal-form" id="login-form">
-      <h3 id="login-title">Login</h3>
-      <p class="muted">Create a local profile stored in your browser. No backend.</p>
+  <!-- Login Modal (Copilot-style) -->
+  <dialog id="login-modal" class="modal" aria-labelledby="login-modal-title">
+    <form method="dialog" id="login-form" class="modal-form" autocomplete="on">
+      <h3 id="login-modal-title">Welcome back</h3>
+      <p class="muted">Sign in to your local AccessFirst account</p>
 
-      <label for="login-username">Username</label>
-      <input id="login-username" type="text" required minlength="2" />
+      <label for="login-email">Email</label>
+      <input id="login-email" type="email" required autocomplete="email" placeholder="you@example.com"/>
 
-      <label for="login-type">User Type</label>
-      <select id="login-type">
-        <option value="none">None</option>
-        <option value="blind">Blind</option>
-        <option value="deaf">Deaf</option>
-      </select>
+      <label for="login-password">Password</label>
+      <input id="login-password" type="password" required autocomplete="current-password" placeholder="Your password"/>
+
+      <div class="social-row">
+        <button type="button" class="social google" id="login-google">Continue with Google</button>
+        <button type="button" class="social ms" id="login-microsoft">Continue with Microsoft</button>
+      </div>
 
       <div class="modal-actions">
-        <button class="btn" type="submit">Login</button>
-        <button class="btn subtle" id="login-cancel" type="button">Cancel</button>
+        <button class="btn btn-primary" type="submit" id="login-submit">Sign in</button>
+        <button class="btn btn-subtle" type="button" id="login-close">Cancel</button>
       </div>
     </form>
   </dialog>
 
   <!-- Signup Modal -->
-  <dialog id="signup-modal" aria-labelledby="signup-title">
-    <form method="dialog" class="modal-form" id="signup-form">
-      <h3 id="signup-title">Sign Up</h3>
-      <p class="muted">Create a local profile with preferences.</p>
+  <dialog id="signup-modal" class="modal" aria-labelledby="signup-modal-title">
+    <form method="dialog" id="signup-form" class="modal-form" autocomplete="on">
+      <h3 id="signup-modal-title">Create account</h3>
+      <p class="muted">Create a secure local account. We'll notify the site owner when a new account is created (simulated via mail client).</p>
 
       <label for="signup-username">Username</label>
-      <input id="signup-username" type="text" required minlength="2" />
+      <input id="signup-username" type="text" required minlength="2" placeholder="Your display name"/>
 
-      <label for="signup-type">User Type</label>
-      <select id="signup-type">
-        <option value="blind">Blind</option>
-        <option value="deaf">Deaf</option>
-        <option value="none">None</option>
-      </select>
+      <label for="signup-email">Email</label>
+      <input id="signup-email" type="email" required placeholder="you@example.com" autocomplete="email"/>
 
-      <fieldset>
-        <legend>UI Preferences</legend>
-        <label><input type="checkbox" id="signup-contrast" /> High contrast</label>
-        <label><input type="checkbox" id="signup-reduced" /> Reduce motion</label>
-        <label for="signup-font">Font size</label>
-        <select id="signup-font"><option value="medium">Medium</option><option value="large">Large</option></select>
+      <label for="signup-password">Password</label>
+      <input id="signup-password" type="password" required placeholder="Choose a strong password" autocomplete="new-password"/>
+      <meter id="pwd-strength" min="0" max="4" low="2" high="3" optimum="4" value="0" aria-hidden="true"></meter>
+      <div id="pwd-feedback" class="muted small">Password strength: </div>
+
+      <fieldset class="prefs-fieldset">
+        <legend>Preferences</legend>
+        <label><input id="signup-contrast" type="checkbox" /> High contrast</label>
+        <label><input id="signup-reduce" type="checkbox" /> Reduce motion</label>
+        <label>Font size
+          <select id="signup-font">
+            <option value="medium" selected>Medium</option>
+            <option value="large">Large</option>
+            <option value="small">Small</option>
+          </select>
+        </label>
       </fieldset>
 
+      <div class="social-row">
+        <button type="button" class="social google" id="signup-google">Sign up with Google</button>
+        <button type="button" class="social ms" id="signup-microsoft">Sign up with Microsoft</button>
+      </div>
+
       <div class="modal-actions">
-        <button class="btn" type="submit">Create Profile</button>
-        <button class="btn subtle" id="signup-cancel" type="button">Cancel</button>
+        <button class="btn btn-primary" type="submit" id="signup-submit">Create account</button>
+        <button class="btn btn-subtle" type="button" id="signup-close">Cancel</button>
       </div>
     </form>
   </dialog>
 
-  <!-- Global live region for screen reader announcements -->
-  <div id="sr-live" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+  <!-- Global live region for announcements -->
+  <div id="live" aria-live="polite" class="visually-hidden"></div>
 
   <!-- Footer -->
-  <footer class="site-footer" role="contentinfo">
+  <footer class="site-footer">
     <div>© <span id="year"></span> AccessFirst — Developed by HaileGebriel</div>
   </footer>
 
