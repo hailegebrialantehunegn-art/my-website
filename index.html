@@ -51,6 +51,8 @@
     </nav>
 
     <div class="header-controls">
+      <button id="global-back" class="nav-back-global btn subtle" aria-hidden="true" title="Back">←</button>
+
       <label class="lang-label" for="lang-select" id="lang-label">Language</label>
       <select id="lang-select" aria-labelledby="lang-label">
         <option value="en">English</option>
@@ -62,7 +64,7 @@
   </header>
 
   <!-- Settings Panel -->
-  <aside id="settings-panel" class="settings-panel" role="region" aria-label="Accessibility settings" hidden>
+  <aside id="settings-panel" class="settings-panel" role="region" aria-hidden="true" aria-label="Accessibility settings" hidden>
     <h2 id="settings-title">Accessibility Settings</h2>
 
     <div class="setting">
@@ -173,8 +175,8 @@
 
           <div class="speech-tools">
             <div class="tool">
-              <h3>Speech-to-Text</h3>
-              <label for="stt-input" class="visually-hidden">Speech input</label>
+              <h3 id="stt-title">Speech-to-Text</h3>
+              <label for="stt-input" class="visually-hidden" id="stt-label">Speech input</label>
               <textarea id="stt-input" rows="4" placeholder="Speak or type; recognized text will appear here"></textarea>
               <div class="tool-actions">
                 <button class="btn" id="stt-start">Start Listening</button>
@@ -184,8 +186,8 @@
             </div>
 
             <div class="tool">
-              <h3>Text-to-Speech</h3>
-              <label for="tts-input" class="visually-hidden">Text to speak</label>
+              <h3 id="tts-title">Text-to-Speech</h3>
+              <label for="tts-input" class="visually-hidden" id="tts-label">Text to speak</label>
               <textarea id="tts-input" rows="4" placeholder="Type text to be spoken"></textarea>
               <div class="tool-actions">
                 <button class="btn" id="tts-speak">Speak</button>
@@ -213,8 +215,8 @@
 
         <div class="deaf-controls">
           <div class="tool">
-            <h3>Speech-to-Sign (Simulated)</h3>
-            <label for="stsign-output" class="visually-hidden">Sign output</label>
+            <h3 id="stsign-title">Speech-to-Sign (Simulated)</h3>
+            <label for="stsign-output" class="visually-hidden" id="stsign-label">Sign output</label>
             <div class="sign-output" id="stsign-output" aria-live="polite"></div>
             <div class="tool-actions">
               <button class="btn" id="stsign-start">Start (speak)</button>
@@ -223,10 +225,10 @@
           </div>
 
           <div class="tool">
-            <h3>Sign-to-Speech (Simulated)</h3>
-            <p>Select signs to form a phrase</p>
+            <h3 id="s2s-title">Sign-to-Speech (Simulated)</h3>
+            <p id="s2s-prompt">Select signs to form a phrase</p>
             <div id="sign-palette" class="sign-palette" role="list">
-              <!-- Sample simulated signs -->
+              <!-- Palette will be localized on load -->
               <button class="sign" data-word="Hello" role="listitem">👋 Hello</button>
               <button class="sign" data-word="Yes" role="listitem">👍 Yes</button>
               <button class="sign" data-word="No" role="listitem">👎 No</button>
@@ -255,10 +257,10 @@
         <h2 id="login-title">Login</h2>
         <p id="login-desc">Enter a username to create a local profile (no backend).</p>
 
-        <label for="login-username">Username</label>
+        <label for="login-username" id="label-login-username">Username</label>
         <input id="login-username" name="username" type="text" required minlength="2" />
 
-        <label for="login-usertype">User type</label>
+        <label for="login-usertype" id="label-login-usertype">User type</label>
         <select id="login-usertype" name="usertype">
           <option value="none">None / Not specified</option>
           <option value="blind">Blind</option>
@@ -266,7 +268,7 @@
         </select>
 
         <div class="modal-actions">
-          <button class="btn" type="submit">Login</button>
+          <button class="btn" type="submit" id="login-submit">Login</button>
           <button class="btn subtle" id="login-cancel" type="button">Cancel</button>
         </div>
       </form>
@@ -277,10 +279,10 @@
         <h2 id="signup-title">Sign Up</h2>
         <p id="signup-desc">Create a local profile stored in your browser.</p>
 
-        <label for="signup-username">Username</label>
+        <label for="signup-username" id="label-signup-username">Username</label>
         <input id="signup-username" name="username" type="text" required minlength="2" />
 
-        <label for="signup-usertype">User type</label>
+        <label for="signup-usertype" id="label-signup-usertype">User type</label>
         <select id="signup-usertype" name="usertype" required>
           <option value="blind">Blind</option>
           <option value="deaf">Deaf</option>
@@ -288,7 +290,7 @@
         </select>
 
         <fieldset>
-          <legend>UI Preferences</legend>
+          <legend id="legend-ui-prefs">UI Preferences</legend>
           <label><input type="checkbox" id="pref-contrast" /> High contrast</label>
           <label><input type="checkbox" id="pref-reduce-motion" /> Reduce motion</label>
           <label for="pref-font">Font size</label>
@@ -299,7 +301,7 @@
         </fieldset>
 
         <div class="modal-actions">
-          <button class="btn" type="submit">Create Profile</button>
+          <button class="btn" type="submit" id="signup-submit">Create Profile</button>
           <button class="btn subtle" id="signup-cancel" type="button">Cancel</button>
         </div>
       </form>
