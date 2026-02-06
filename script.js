@@ -1,1049 +1,833 @@
 /**
  * script.js
- * AccessFirst — Accessibility-first interactive demo
- * Vanilla JS only. No frameworks, no backend.
+ * AccessFirst — Full accessible front-end demo
+ * - Vanilla JavaScript only
+ * - Implements speech features, sign detection (HandsSign + TensorFlow), preferences,
+ *   profiles, history, reminders, demo mode, and accessible interactions.
  *
- * NOTE: This file continues and augments the previously provided implementation.
- * Only missing features were added:
- * - Global header back button + navigation history stack
- * - Comprehensive i18n keys for modals, labels, placeholders, settings, sign palette
- * - Language application to Login/Signup, placeholders, alerts, reminders, STT/TTS, Sign UI
- * - Announcements for mode changes (contrast/font/reduced-motion/demo)
- * - Graceful keyboard "Escape" -> back behavior
- * - Minor styling references (transient alerts/sign reminders) handled
+ * Note:
+ * - This file gracefully handles missing APIs (SpeechRecognition, speechSynthesis, camera, TensorFlow/Handsign)
+ * - Persistent data keys in localStorage:
+ *   - af_profile
+ *   - af_prefs
+ *   - af_history
  *
- * Existing functionality was preserved and extended.
+ * Developed by: HaileGebriel
  */
 
-/* ============
-   Utility & State
-   ============ */
+/* ============================
+   Constants & State
+   ============================ */
+const KEYS = {
+  PROFILE: 'af_profile',
+  PREFS: 'af_prefs',
+  HISTORY: 'af_history'
+};
+
 const State = {
-  lang: 'en', // 'en' or 'am'
   profile: null,
   prefs: {
     contrast: false,
-    fontSize: 'medium',
+    fontSize: 'medium', // small | medium | large
     reduceMotion: false,
     demo: false
   },
-  currentPage: 'home',
-  recognition: null,
-  recognitionActive: false,
-  sttHistoryKey: 'af_history',
-  reminderIntervalId: null,
-  reminderMs: 180000, // 3 minutes
-  historyStack: [] // navigation history for global back
-};
-
-/* ============
-   I18n: expanded keys including modal labels and messages
-   ============ */
-const I18N = {
-  en: {
-    welcome: "Welcome to AccessFirst",
-    tagline: "An accessibility-first demo — English & Amharic supported",
-    getStarted: "Get Started",
-    continueGuest: "Continue as Guest",
-    donate: "Donate",
-    home: "Home",
-    accessibility: "Accessibility",
-    login: "Login",
-    signup: "Sign Up",
-    blind: "Blind",
-    deaf: "Deaf",
-    speechToText: "Speech-to-Text",
-    textToSpeech: "Text-to-Speech",
-    signToSpeech: "Sign-to-Speech",
-    speechToSign: "Speech-to-Sign",
-    enableVoice: "Enable Voice Feedback",
-    disableVoice: "Disable Voice Feedback",
-    loginReminder: "Please log in to save your progress.",
-    loginReminderTitle: "Login Reminder",
-    demoStart: "Demo mode starting...",
-    demoEnd: "Demo complete.",
-    prefsSaved: "Preferences saved",
-    profileSaved: "Profile saved locally",
-    speechNotSupported: "Speech features are not supported in this browser.",
-    recognitionStart: "Listening...",
-    recognitionStop: "Stopped listening.",
-    speakNow: "Please speak now",
-    phraseSpoken: "Phrase spoken",
-    back: "Back",
-    loginTitle: "Login",
-    loginDesc: "Enter a username to create a local profile (no backend).",
-    signupTitle: "Sign Up",
-    signupDesc: "Create a local profile stored in your browser.",
-    usernameLabel: "Username",
-    usertypeLabel: "User type",
-    userTypeNone: "None / Not specified",
-    invalidUsername: "Please enter a valid username (2+ characters).",
-    cancel: "Cancel",
-    sttPlaceholder: "Speak or type; recognized text will appear here",
-    ttsPlaceholder: "Type text to be spoken",
-    sttTitle: "Speech-to-Text",
-    ttsTitle: "Text-to-Speech",
-    stsignTitle: "Speech-to-Sign (Simulated)",
-    s2sTitle: "Sign-to-Speech (Simulated)",
-    s2sPrompt: "Select signs to form a phrase",
-    settingsTitle: "Accessibility Settings",
-    highContrast: "High Contrast",
-    fontSize: "Font Size",
-    reduceMotion: "Reduce Motion",
-    demoMode: "Demo Mode",
-    resetPrefs: "Reset Preferences",
-    contrastOn: "High contrast enabled",
-    contrastOff: "High contrast disabled",
-    reducedMotionOn: "Reduced motion enabled",
-    reducedMotionOff: "Reduced motion disabled",
-    fontSizeChanged: "Font size updated",
-    demoModeOn: "Demo mode enabled",
-    demoModeOff: "Demo mode disabled",
-    prefsReset: "Preferences reset",
-    signPalette: ["Hello","Yes","No","Thank you","Help","Good"],
-    signPaletteEmoji: {"Hello":"👋","Yes":"👍","No":"👎","Thank you":"🙏","Help":"🆘","Good":"🌟"},
-    signPaletteAm: ["ሰላም","አዎ","አይ","አመሰግናለሁ","እገዛ","ጎድ"],
-    signPaletteEmojiAm: {"ሰላም":"👋","አዎ":"👍","አይ":"👎","አመሰግናለሁ":"🙏","እገዛ":"🆘","ጎድ":"🌟"}
+  speech: {
+    supported: 'speechSynthesis' in window,
+    recognitionSupported: !!(window.SpeechRecognition || window.webkitSpeechRecognition),
+    recognition: null,
+    recognizing: false
   },
-  am: {
-    welcome: "AccessFirst በደህና መጡ",
-    tagline: "የቅ���ሚያ መግለጫ — እንግሊዝኛ & አማርኛ ይደግፋሉ",
-    getStarted: "ጀምር",
-    continueGuest: "እንደ ጉስት ይቀጥሉ",
-    donate: "ድጋፍ ለመስጠት",
-    home: "ቤት",
-    accessibility: "አስተዳደር",
-    login: "ግባ",
-    signup: "ይመዝገቡ",
-    blind: "የዓይን ጉዳት",
-    deaf: "የመሰማት ችግኝ",
-    speechToText: "ንግግር ወደ ጽሑፍ",
-    textToSpeech: "ጽሑፍ ወደ ድምጽ",
-    signToSpeech: "ምልክት ወደ ድምጽ",
-    speechToSign: "ድምጽ ወደ ምልክት",
-    enableVoice: "የድምጽ እትም እንዲሰማ",
-    disableVoice: "የድምጽ እትምን ዝጋ",
-    loginReminder: "እባክዎን የስራዎን ሂደት ለማስቀመጥ ይግቡ።",
-    loginReminderTitle: "የግባ ማሳሰቢያ",
-    demoStart: "የሞዴሉ ሙከራ ተጀምሯል...",
-    demoEnd: "ሞዴሉ ጨርሏል።",
-    prefsSaved: "የቅኝ ቅንብሮች ተቀይሯል",
-    profileSaved: "ፕሮፋይሉ በአካል ተመዝግቧል",
-    speechNotSupported: "የድምጽ ባለሞያ ስርዓት በዚህ በስር ብሮዘር አይደገፍም።",
-    recognitionStart: "እየሰማሁ...",
-    recognitionStop: "እየቆመ።",
-    speakNow: "አሁን ናገሩ",
-    phraseSpoken: "የተናገረው ንግግር",
-    back: "ተመለስ",
-    loginTitle: "ግባ",
-    loginDesc: "የአካል ፕሮፋይል ለማቅረብ ስም ያስገቡ (አንደ ዳታ ብቻ).",
-    signupTitle: "ይመዝገቡ",
-    signupDesc: "ፕሮፋይል በአካሉ በአካል ይጠብቃሉ።",
-    usernameLabel: "የተጠቃሚ ስም",
-    usertypeLabel: "የተጠቃሚ አይነት",
-    userTypeNone: "ምንም / ያልተገለጸ",
-    invalidUsername: "እባክዎን መልካም የሆነ የተጠቃሚ ስም ያስገቡ (2+ ቁምፊ).",
-    cancel: "ሰርዝ",
-    sttPlaceholder: "ይናገሩ ወይም ይጻፉ; የተወሰደ ጽሑፍ እዚህ ይታያል",
-    ttsPlaceholder: "የሚናገር ጽሑፍ ያስገቡ",
-    sttTitle: "ንግግር ወደ ጽሑፍ",
-    ttsTitle: "ጽሑፍ ወደ ድምጽ",
-    stsignTitle: "ድምጽ ወደ ምልክት (ምሳሌ)",
-    s2sTitle: "ምልክት ወደ ድምጽ (ምሳሌ)",
-    s2sPrompt: "ንግግር ለማመንጨት ምልክቶችን ይምረጡ",
-    settingsTitle: "የማስተካከያ ቅንብሮች",
-    highContrast: "ከፍተኛ ኮንትራስት",
-    fontSize: "የቁምፊ መጠን",
-    reduceMotion: "እንቅስቃሴን አሳስበው",
-    demoMode: "የሙከራ ሁኔታ",
-    resetPrefs: "የቅንብሮችን እርምጃ ዳግም",
-    contrastOn: "ከፍተኛ ኮንትራስት ተነስቷል",
-    contrastOff: "ከፍተኛ ኮንትራስት ተዘጋ",
-    reducedMotionOn: "እንቅስቃሴ ተቀነሰ",
-    reducedMotionOff: "እንቅስቃሴ እንደገና ተፈትቷል",
-    fontSizeChanged: "የቁምፊ መጠን ተቀይሯል",
-    demoModeOn: "የሙከራ ሁኔታ ተነስቷል",
-    demoModeOff: "የሙከራ ሁኔታ ተዘጋ",
-    prefsReset: "የቅንብሮች እንደገና ተቀናብሯል",
-    signPalette: ["ሰላም","አዎ","አይ","አመሰግናለሁ","እገዛ","ጎድ"],
-    signPaletteEmoji: {"ሰላም":"👋","አዎ":"👍","አይ":"👎","አመሰግናለሁ":"🙏","እገዛ":"🆘","ጎድ":"🌟"}
-  }
+  handsign: {
+    enabled: false,
+    modelUrl: 'https://cdn.jsdelivr.net/gh/syauqy/handsign-tensorflow@main/model/model.json',
+    initialized: false,
+    detector: null, // will hold handsign object or fallback
+    streaming: false,
+    videoStream: null
+  },
+  reminderInterval: null,
+  demoTimer: null
 };
 
-/* DOM cache - will be filled after DOMContentLoaded */
-const dom = {};
+/* ============================
+   DOM Cache
+   ============================ */
+const DOM = {};
 document.addEventListener('DOMContentLoaded', () => {
-  // gather elements used below (keep existing ids)
+  // Page elements
   [
-    'lang-select','lang-quick-select','settings-toggle','settings-panel','contrast-toggle','font-size','reduced-motion','demo-mode','reset-prefs',
-    'home','access-choice','blind-flow','deaf-flow','nav-home','nav-access','nav-login','nav-signup','nav-guest','donate','cta-get-started','cta-guest','donate-cta',
-    'btn-blind','btn-deaf','back-from-access','back-from-blind','back-from-deaf','login-modal','signup-modal','login-form','signup-form',
-    'login-username','login-usertype','signup-username','signup-usertype','pref-contrast','pref-reduce-motion','pref-font',
-    'voice-toggle','stt-start','stt-stop','stt-input','stt-clear','tts-speak','tts-stop','tts-input','tts-clear',
-    'stsign-start','stsign-stop','stsign-output','sign-palette','assembled-phrase','s2s-speak','s2s-clear','history-list-blind','history-list-deaf',
-    'aria-live','year','global-back','settings-title','stt-title','tts-title','stsign-title','s2s-title','s2s-prompt','label-login-username','label-login-usertype',
-    'label-signup-username','label-signup-usertype','login-desc','signup-desc','login-title','signup-title','login-cancel','signup-cancel','reset-prefs'
-  ].forEach(id => {
-    dom[id] = document.getElementById(id);
-  });
+    'main',
+    'home','access-choice','blind-flow','deaf-flow',
+    'nav-home','nav-access','nav-login','nav-signup','nav-guest','donate-link',
+    'cta-start','cta-guest','cta-donate','contrast-toggle','font-size','reduced-motion','demo-mode',
+    'tts-area','tts-speak','tts-stop','tts-clear',
+    'choose-blind','choose-deaf',
+    'stt-output','stt-start','stt-stop','stt-copy','blind-tts','blind-tts-speak','blind-tts-stop','blind-tts-clear','history-blind',
+    'sign-palette','assembled-phrase','s2s-speak','s2s-clear','camera-video','camera-canvas','start-detection','stop-detection','detected-sign','speak-detected','camera-status','history-deaf',
+    'login-modal','signup-modal','login-form','signup-form','login-username','login-type','signup-username','signup-type','signup-contrast','signup-reduced','signup-font',
+    'login-cancel','signup-cancel','year','sr-live'
+  ].forEach(id => DOM[id] = document.getElementById(id));
 
-  // Initialize language, prefs, profile, speech, reminders
-  initLang();
+  // Setup initial UI
   loadPrefs();
-  restoreProfile();
-  applyPrefs();
-  translateAll();
-  attachListeners();
-  initSpeech();
-  initReminder();
+  loadProfile();
+  applyPrefsToUI();
   populateYear();
-  loadHistory();
-  maybeStartDemo();
+  translateStatic(); // small helper for static labels if needed
+
+  // Attach event listeners
+  attachUIListeners();
+
+  // Initialize speech recognition if supported
+  initSpeechRecognition();
+
+  // Initialize handsign if scripts loaded
+  initHandsignIfAvailable();
+
+  // Load history
+  renderHistory();
+
+  // Start reminders
+  startReminders();
+
+  // Maybe demo
+  if (State.prefs.demo) startDemoMode();
 });
 
-/* ============
-   Initialization Helpers
-   ============ */
+/* ============================
+   Helpers: Storage & UI
+   ============================ */
 
-function initLang(){
-  try {
-    const stored = localStorage.getItem('af_lang');
-    if (stored) {
-      State.lang = stored;
-    } else {
-      const nav = (navigator.languages && navigator.languages[0]) || navigator.language || 'en';
-      State.lang = (nav && nav.indexOf('am') === 0) ? 'am' : 'en';
-      localStorage.setItem('af_lang', State.lang);
-    }
-    // Sync selects
-    if (dom['lang-select']) dom['lang-select'].value = State.lang;
-    if (dom['lang-quick-select']) dom['lang-quick-select'].value = State.lang;
-    document.documentElement.lang = State.lang === 'am' ? 'am' : 'en';
-  } catch(e){}
+function saveProfile(profile) {
+  State.profile = profile;
+  localStorage.setItem(KEYS.PROFILE, JSON.stringify(profile));
+  announce(`Profile saved for ${profile.username}`);
 }
 
-function loadPrefs(){
+function loadProfile() {
   try {
-    const raw = localStorage.getItem('af_prefs');
-    if (raw) {
-      const p = JSON.parse(raw);
-      State.prefs = Object.assign(State.prefs, p);
-    }
-    // Reflect UI
-    if (dom['contrast-toggle']) dom['contrast-toggle'].checked = State.prefs.contrast;
-    if (dom['font-size']) dom['font-size'].value = State.prefs.fontSize;
-    if (dom['reduced-motion']) dom['reduced-motion'].checked = State.prefs.reduceMotion;
-    if (dom['demo-mode']) dom['demo-mode'].checked = State.prefs.demo;
-  } catch(e){}
+    const raw = localStorage.getItem(KEYS.PROFILE);
+    if (raw) State.profile = JSON.parse(raw);
+  } catch (e) {
+    console.warn('Load profile error', e);
+  }
 }
 
-function restoreProfile(){
-  try {
-    const raw = localStorage.getItem('af_profile');
-    if (raw) {
-      State.profile = JSON.parse(raw);
-      if (State.profile && State.profile.uiPrefs) {
-        State.prefs = Object.assign(State.prefs, State.profile.uiPrefs);
-      }
-    }
-  } catch(e){}
+function savePrefs() {
+  localStorage.setItem(KEYS.PREFS, JSON.stringify(State.prefs));
 }
 
-function applyPrefs(){
-  // High contrast
-  if (State.prefs.contrast) document.documentElement.classList.add('high-contrast'); else document.documentElement.classList.remove('high-contrast');
+function loadPrefs() {
+  try {
+    const raw = localStorage.getItem(KEYS.PREFS);
+    if (raw) State.prefs = Object.assign(State.prefs, JSON.parse(raw));
+  } catch (e) {
+    console.warn('Load prefs', e);
+  }
+}
+
+function saveHistory(arr) {
+  localStorage.setItem(KEYS.HISTORY, JSON.stringify(arr));
+}
+function loadHistoryArray() {
+  try {
+    return JSON.parse(localStorage.getItem(KEYS.HISTORY) || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+
+function pushHistory(item) {
+  const arr = loadHistoryArray();
+  arr.unshift(Object.assign({timestamp: Date.now()}, item));
+  saveHistory(arr.slice(0, 200));
+  renderHistory();
+}
+
+function renderHistory() {
+  const arr = loadHistoryArray();
+  if (DOM['history-blind']) {
+    DOM['history-blind'].innerHTML = '';
+    arr.filter(i => ['stt', 'tts', 's2s'].includes(i.type)).slice(0, 50).forEach(it => {
+      const li = document.createElement('li');
+      li.textContent = `${new Date(it.timestamp).toLocaleTimeString()} — ${it.type}: ${it.text}`;
+      DOM['history-blind'].appendChild(li);
+    });
+  }
+  if (DOM['history-deaf']) {
+    DOM['history-deaf'].innerHTML = '';
+    arr.filter(i => ['sign', 'stsign', 's2s'].includes(i.type)).slice(0, 50).forEach(it => {
+      const li = document.createElement('li');
+      li.textContent = `${new Date(it.timestamp).toLocaleTimeString()} — ${it.type}: ${it.text}`;
+      DOM['history-deaf'].appendChild(li);
+    });
+  }
+}
+
+/* Apply preference toggles to UI state */
+function applyPrefsToUI() {
+  // Contrast
+  if (State.prefs.contrast) document.documentElement.classList.add('high-contrast');
+  else document.documentElement.classList.remove('high-contrast');
+
   // Font size
-  const size = State.prefs.fontSize || 'medium';
-  document.documentElement.style.fontSize = size === 'large' ? '18px' : (size === 'small' ? '14px' : '16px');
+  if (State.prefs.fontSize === 'large') document.documentElement.style.fontSize = '18px';
+  else if (State.prefs.fontSize === 'small') document.documentElement.style.fontSize = '14px';
+  else document.documentElement.style.fontSize = '';
+
   // Reduced motion
-  if (State.prefs.reduceMotion) document.documentElement.classList.add('reduced-motion'), document.documentElement.setAttribute('reduce-motion','true');
-  else document.documentElement.classList.remove('reduced-motion'), document.documentElement.removeAttribute('reduce-motion');
+  if (State.prefs.reduceMotion) document.documentElement.classList.add('reduced-motion');
+  else document.documentElement.classList.remove('reduced-motion');
+
+  // Sync controls
+  if (DOM['contrast-toggle']) DOM['contrast-toggle'].checked = !!State.prefs.contrast;
+  if (DOM['font-size']) DOM['font-size'].value = State.prefs.fontSize || 'medium';
+  if (DOM['reduced-motion']) DOM['reduced-motion'].checked = !!State.prefs.reduceMotion;
+  if (DOM['demo-mode']) DOM['demo-mode'].checked = !!State.prefs.demo;
 }
 
-/* ============
-   I18n & Translation
-   ============ */
-function t(key){
-  const map = I18N[State.lang] || I18N.en;
-  return map[key] !== undefined ? map[key] : (I18N.en[key] || key);
-}
+/* ============================
+   Small UI & Accessibility Utilities
+   ============================ */
 
-function translateAll(){
-  // Main headings & nav
-  const homeHeading = document.getElementById('home-heading');
-  if (homeHeading) homeHeading.textContent = t('welcome');
-  const heroSub = document.getElementById('hero-sub');
-  if (heroSub) heroSub.textContent = t('tagline');
-
-  if (dom['cta-get-started']) dom['cta-get-started'].textContent = t('getStarted');
-  if (dom['cta-guest']) dom['cta-guest'].textContent = t('continueGuest');
-  if (dom['donate-cta']) dom['donate-cta'].textContent = t('donate');
-
-  if (dom['nav-home']) dom['nav-home'].textContent = t('home');
-  if (dom['nav-access']) dom['nav-access'].textContent = t('accessibility');
-  if (dom['nav-login']) dom['nav-login'].textContent = t('login');
-  if (dom['nav-signup']) dom['nav-signup'].textContent = t('signup');
-
-  // Access choice labels
-  if (dom['btn-blind']) dom['btn-blind'].querySelector('span:last-child').textContent = t('blind');
-  if (dom['btn-deaf']) dom['btn-deaf'].querySelector('span:last-child').textContent = t('deaf');
-
-  // Blind & Deaf headings
-  const blindHeading = document.getElementById('blind-heading');
-  if (blindHeading) blindHeading.textContent = t('blind') + " Mode";
-  const deafHeading = document.getElementById('deaf-heading');
-  if (deafHeading) deafHeading.textContent = t('deaf') + " Mode";
-
-  // Tool titles & placeholders
-  if (dom['stt-title']) dom['stt-title'].textContent = t('sttTitle');
-  if (dom['tts-title']) dom['tts-title'].textContent = t('ttsTitle');
-  if (dom['stsign-title']) dom['stsign-title'].textContent = t('stsignTitle');
-  if (dom['s2s-title']) dom['s2s-title'].textContent = t('s2sTitle');
-  if (dom['s2s-prompt']) dom['s2s-prompt'].textContent = t('s2sPrompt');
-
-  if (dom['stt-input']) dom['stt-input'].placeholder = t('sttPlaceholder');
-  if (dom['tts-input']) dom['tts-input'].placeholder = t('ttsPlaceholder');
-
-  // Settings
-  if (dom['settings-title']) dom['settings-title'].textContent = t('settingsTitle');
-  const contrastLabel = document.getElementById('contrast-label');
-  if (contrastLabel) contrastLabel.textContent = t('highContrast');
-  const fontLabel = document.getElementById('font-size-label');
-  if (fontLabel) fontLabel.textContent = t('fontSize');
-  const reduceLabel = document.getElementById('reduced-motion-label');
-  if (reduceLabel) reduceLabel.textContent = t('reduceMotion');
-  const demoLabel = document.getElementById('demo-mode-label');
-  if (demoLabel) demoLabel.textContent = t('demoMode');
-  if (dom['reset-prefs']) dom['reset-prefs'].textContent = t('resetPrefs');
-
-  // Login / Signup modals
-  if (dom['login-title']) dom['login-title'].textContent = t('loginTitle');
-  if (dom['login-desc']) dom['login-desc'].textContent = t('loginDesc');
-  if (dom['label-login-username']) dom['label-login-username'].textContent = t('usernameLabel');
-  if (dom['label-login-usertype']) dom['label-login-usertype'].textContent = t('usertypeLabel');
-  if (dom['login-cancel']) dom['login-cancel'].textContent = t('cancel');
-
-  if (dom['signup-title']) dom['signup-title'].textContent = t('signupTitle');
-  if (dom['signup-desc']) dom['signup-desc'].textContent = t('signupDesc');
-  if (dom['label-signup-username']) dom['label-signup-username'].textContent = t('usernameLabel');
-  if (dom['label-signup-usertype']) dom['label-signup-usertype'].textContent = t('usertypeLabel');
-  if (dom['signup-cancel']) dom['signup-cancel'].textContent = t('cancel');
-
-  // Voice toggle label (depends on profile state)
-  if (dom['voice-toggle']) dom['voice-toggle'].textContent = (State.profile && State.profile.voiceEnabled) ? t('disableVoice') : t('enableVoice');
-
-  // Sign palette localization - regenerate buttons based on language
-  const palette = dom['sign-palette'];
-  if (palette) {
-    palette.innerHTML = '';
-    if (State.lang === 'am') {
-      const words = t('signPalette');
-      const emojiMap = (I18N[State.lang] && I18N[State.lang].signPaletteEmoji) || {};
-      words.forEach(w => {
-        const e = emojiMap[w] || '🤟';
-        const btn = document.createElement('button');
-        btn.className = 'sign';
-        btn.type = 'button';
-        btn.dataset.word = w;
-        btn.setAttribute('role','listitem');
-        btn.innerHTML = `${e} ${w}`;
-        palette.appendChild(btn);
-      });
-    } else {
-      const words = t('signPalette');
-      const emojiMap = (I18N[State.lang] && I18N[State.lang].signPaletteEmoji) || {};
-      words.forEach(w => {
-        const e = emojiMap[w] || '🤟';
-        const btn = document.createElement('button');
-        btn.className = 'sign';
-        btn.type = 'button';
-        btn.dataset.word = w;
-        btn.setAttribute('role','listitem');
-        btn.innerHTML = `${e} ${w}`;
-        palette.appendChild(btn);
-      });
-    }
+function announce(message) {
+  // Update SR live region
+  if (DOM['sr-live']) DOM['sr-live'].textContent = message;
+  // If profile blind + voice enabled, speak
+  if (State.profile && State.profile.userType === 'blind' && State.profile.voiceEnabled) {
+    speak(message, {interrupt:true});
   }
 }
 
-/* ============
-   Navigation & Page Management (with history stack & global back)
-   ============ */
-
-function showPage(id, opts = { fromHistory: false }) {
-  const pages = document.querySelectorAll('.page');
-  // Push previous to history if not from history navigation and different
-  if (!opts.fromHistory && State.currentPage && State.currentPage !== id) {
-    State.historyStack.push(State.currentPage);
-  }
-  pages.forEach(p => {
+/* Simple show/hide page - all pages are sections with ids */
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => {
     if (p.id === id) {
-      p.classList.add('page--active');
-      p.hidden = false;
-      p.setAttribute('aria-hidden','false');
-      // focus first focusable
+      p.classList.add('page-active');
+      p.removeAttribute('hidden');
+      // focus first interactive element
       setTimeout(()=> {
-        const first = p.querySelector('button, a, input, textarea, select');
-        if (first) first.focus();
+        const focusable = p.querySelector('button,a,input,textarea,select');
+        if (focusable) focusable.focus();
       }, 200);
     } else {
-      p.classList.remove('page--active');
+      p.classList.remove('page-active');
       p.hidden = true;
-      p.setAttribute('aria-hidden','true');
     }
   });
-  State.currentPage = id;
-  // Toggle global back visibility
-  updateGlobalBackVisibility();
-  // small aria hint
-  announce(t('back'));
+  // Announce navigation
+  announce(`Navigated to ${id.replace('-', ' ')}`);
 }
 
-function updateGlobalBackVisibility(){
-  const gb = dom['global-back'];
-  if (!gb) return;
-  if (State.historyStack.length > 0 && State.currentPage !== 'home') {
-    gb.setAttribute('aria-hidden','false');
-  } else {
-    gb.setAttribute('aria-hidden','true');
-  }
+/* Populate year in footer */
+function populateYear(){
+  if (DOM['year']) DOM['year'].textContent = new Date().getFullYear();
 }
 
-function attachListeners(){
-  // Nav buttons
+/* Translate static text if needed - site is English only per spec */
+function translateStatic(){
+  // No-op for English site; kept for structure
+}
+
+/* ============================
+   Event Attachments
+   ============================ */
+function attachUIListeners() {
+  // Navigation buttons
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
-      const target = e.currentTarget.getAttribute('data-target');
-      const modal = e.currentTarget.getAttribute('data-modal');
-      if (target) {
-        showPage(target);
-      } else if (modal) {
-        openModal(`${modal}-modal`);
-      }
+      const target = btn.dataset.target;
+      const modal = btn.dataset.modal;
+      if (target) showPage(target);
+      if (modal) openModal(modal);
+    });
+    // keyboard activation (Enter/Space)
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); btn.click(); }
     });
   });
 
-  if (dom['nav-guest']) dom['nav-guest'].addEventListener('click', ()=> continueAsGuest());
-  if (dom['donate']) dom['donate'].addEventListener('click', ()=> announce(t('donate')));
+  // CTA buttons
+  if (DOM['cta-start']) DOM['cta-start'].addEventListener('click', ()=> showPage('access-choice'));
+  if (DOM['cta-guest']) DOM['cta-guest'].addEventListener('click', continueAsGuest);
+  if (DOM['cta-donate']) DOM['cta-donate'].addEventListener('click', ()=> announce('Opening donate link'));
 
-  // CTA
-  if (dom['cta-get-started']) dom['cta-get-started'].addEventListener('click', ()=> showPage('access-choice'));
-  if (dom['cta-guest']) dom['cta-guest'].addEventListener('click', ()=> continueAsGuest());
-
-  // Back buttons inside pages
-  if (dom['back-from-access']) dom['back-from-access'].addEventListener('click', ()=> showPage('home'));
-  if (dom['back-from-blind']) dom['back-from-blind'].addEventListener('click', ()=> showPage('access-choice'));
-  if (dom['back-from-deaf']) dom['back-from-deaf'].addEventListener('click', ()=> showPage('access-choice'));
-
-  // Global header back
-  if (dom['global-back']) dom['global-back'].addEventListener('click', ()=> {
-    if (State.historyStack.length === 0) {
-      showPage('home');
-      return;
-    }
-    const prev = State.historyStack.pop();
-    showPage(prev, { fromHistory: true });
-  });
-
-  // Language selects
-  if (dom['lang-select']) dom['lang-select'].addEventListener('change', (e) => setLang(e.target.value));
-  if (dom['lang-quick-select']) dom['lang-quick-select'].addEventListener('change', (e) => setLang(e.target.value));
-
-  // Settings panel toggle
-  if (dom['settings-toggle']) dom['settings-toggle'].addEventListener('click', (e) => {
-    const expanded = e.currentTarget.getAttribute('aria-expanded') === 'true';
-    e.currentTarget.setAttribute('aria-expanded', String(!expanded));
-    dom['settings-panel'].hidden = expanded;
-    dom['settings-panel'].setAttribute('aria-hidden', String(expanded));
-    if (!expanded) dom['settings-panel'].querySelector('input,select,button')?.focus();
-  });
-
-  // Prefs controls
-  if (dom['contrast-toggle']) dom['contrast-toggle'].addEventListener('change', (e) => {
+  // Preference controls
+  if (DOM['contrast-toggle']) DOM['contrast-toggle'].addEventListener('change', (e) => {
     State.prefs.contrast = e.target.checked;
+    applyPrefsToUI();
     savePrefs();
-    applyPrefs();
-    announce(e.target.checked ? t('contrastOn') : t('contrastOff'));
+    announce(State.prefs.contrast ? 'High contrast enabled' : 'High contrast disabled');
   });
-  if (dom['font-size']) dom['font-size'].addEventListener('change', (e) => {
+  if (DOM['font-size']) DOM['font-size'].addEventListener('change', (e) => {
     State.prefs.fontSize = e.target.value;
+    applyPrefsToUI();
     savePrefs();
-    applyPrefs();
-    announce(t('fontSizeChanged'));
+    announce('Font size updated');
   });
-  if (dom['reduced-motion']) dom['reduced-motion'].addEventListener('change', (e) => {
+  if (DOM['reduced-motion']) DOM['reduced-motion'].addEventListener('change', (e) => {
     State.prefs.reduceMotion = e.target.checked;
+    applyPrefsToUI();
     savePrefs();
-    applyPrefs();
-    announce(e.target.checked ? t('reducedMotionOn') : t('reducedMotionOff'));
+    announce(State.prefs.reduceMotion ? 'Reduced motion enabled' : 'Reduced motion disabled');
   });
-  if (dom['demo-mode']) dom['demo-mode'].addEventListener('change', (e) => {
+  if (DOM['demo-mode']) DOM['demo-mode'].addEventListener('change', (e) => {
     State.prefs.demo = e.target.checked;
     savePrefs();
-    announce(e.target.checked ? t('demoModeOn') : t('demoModeOff'));
-    maybeStartDemo();
+    if (State.prefs.demo) startDemoMode(); else stopDemoMode();
+    announce(State.prefs.demo ? 'Demo mode enabled' : 'Demo mode disabled');
   });
-  if (dom['reset-prefs']) dom['reset-prefs'].addEventListener('click', resetPrefs);
 
-  // Login / signup modals
+  // TTS area on Home
+  if (DOM['tts-speak']) DOM['tts-speak'].addEventListener('click', ()=> {
+    const text = (DOM['tts-area'] && DOM['tts-area'].value) || 'Hello, welcome to AccessFirst';
+    speak(text);
+    pushHistory({type:'tts', text});
+  });
+  if (DOM['tts-stop']) DOM['tts-stop'].addEventListener('click', ()=> stopSpeaking());
+  if (DOM['tts-clear']) DOM['tts-clear'].addEventListener('click', ()=> { if (DOM['tts-area']) DOM['tts-area'].value=''; });
+
+  // Access choice
+  if (DOM['choose-blind']) DOM['choose-blind'].addEventListener('click', ()=> {
+    if (!State.profile) continueAsGuest();
+    State.profile.userType = 'blind';
+    saveProfile(State.profile);
+    showPage('blind-flow');
+    announce('Blind mode enabled');
+  });
+  if (DOM['choose-deaf']) DOM['choose-deaf'].addEventListener('click', ()=> {
+    if (!State.profile) continueAsGuest();
+    State.profile.userType = 'deaf';
+    saveProfile(State.profile);
+    showPage('deaf-flow');
+    announce('Deaf mode enabled');
+  });
+
+  // Blind flow: STT & TTS
+  if (DOM['stt-start']) DOM['stt-start'].addEventListener('click', startSpeechRecognition);
+  if (DOM['stt-stop']) DOM['stt-stop'].addEventListener('click', stopSpeechRecognition);
+  if (DOM['stt-copy']) DOM['stt-copy'].addEventListener('click', ()=> {
+    if (DOM['stt-output']) {
+      navigator.clipboard?.writeText(DOM['stt-output'].value || '').then(()=> announce('Copied to clipboard'));
+    }
+  });
+
+  if (DOM['blind-tts-speak']) DOM['blind-tts-speak'].addEventListener('click', ()=> {
+    const t = DOM['blind-tts'].value || 'Hello';
+    speak(t);
+    pushHistory({type:'tts', text:t});
+  });
+  if (DOM['blind-tts-stop']) DOM['blind-tts-stop'].addEventListener('click', ()=> stopSpeaking());
+  if (DOM['blind-tts-clear']) DOM['blind-tts-clear'].addEventListener('click', ()=> { if (DOM['blind-tts']) DOM['blind-tts'].value = ''; });
+
+  // Deaf flow: Sign-to-speech palette
+  populateSignPalette();
+  if (DOM['sign-palette']) DOM['sign-palette'].addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-sign]');
+    if (!btn) return;
+    const word = btn.dataset.sign;
+    appendToPhrase(word);
+  });
+  if (DOM['s2s-speak']) DOM['s2s-speak'].addEventListener('click', ()=> {
+    const phrase = DOM['assembled-phrase'].textContent.trim();
+    if (!phrase) { announce('No phrase to speak'); return; }
+    speak(phrase);
+    pushHistory({type:'s2s', text:phrase});
+  });
+  if (DOM['s2s-clear']) DOM['s2s-clear'].addEventListener('click', ()=> { DOM['assembled-phrase'].textContent=''; });
+
+  // Deaf flow: camera & detection
+  if (DOM['start-detection']) DOM['start-detection'].addEventListener('click', startHandsignDetection);
+  if (DOM['stop-detection']) DOM['stop-detection'].addEventListener('click', stopHandsignDetection);
+  if (DOM['speak-detected']) DOM['speak-detected'].addEventListener('click', ()=> {
+    const txt = DOM['detected-sign'].textContent || '';
+    if (txt && txt !== 'No sign detected') { speak(txt); pushHistory({type:'sign', text:txt}); }
+  });
+
+  // Login / Signup modals
   const navLogin = document.getElementById('nav-login');
   const navSignup = document.getElementById('nav-signup');
   if (navLogin) navLogin.addEventListener('click', ()=> openModal('login-modal'));
   if (navSignup) navSignup.addEventListener('click', ()=> openModal('signup-modal'));
 
-  const loginCancel = document.getElementById('login-cancel');
-  const signupCancel = document.getElementById('signup-cancel');
-  if (loginCancel) loginCancel.addEventListener('click', ()=> closeModal('login-modal'));
-  if (signupCancel) signupCancel.addEventListener('click', ()=> closeModal('signup-modal'));
+  if (DOM['login-form']) {
+    DOM['login-form'].addEventListener('submit', (e) => {
+      e.preventDefault();
+      const username = (DOM['login-username'] && DOM['login-username'].value.trim()) || '';
+      const type = (DOM['login-type'] && DOM['login-type'].value) || 'none';
+      if (!username || username.length < 2) { alert('Please enter a valid username (2+ characters).'); return; }
+      saveProfile({username, userType: type, uiPrefs: Object.assign({}, State.prefs), voiceEnabled: false});
+      closeModal('login-modal');
+    });
+    if (DOM['login-cancel']) DOM['login-cancel'].addEventListener('click', ()=> closeModal('login-modal'));
+  }
 
-  // Login form
-  const loginForm = document.getElementById('login-form');
-  if (loginForm) loginForm.addEventListener('submit', (e)=>{
-    e.preventDefault();
-    const username = (dom['login-username'] && dom['login-username'].value.trim()) || '';
-    const usertype = (dom['login-usertype'] && dom['login-usertype'].value) || 'none';
-    if (!username || username.length < 2) {
-      alert(t('invalidUsername'));
-      return;
-    }
-    const profile = {
-      username, userType: usertype, preferredLang: State.lang, uiPrefs: State.prefs, voiceEnabled: false
-    };
-    saveProfile(profile);
-    closeModal('login-modal');
-    announce(t('profileSaved'));
+  if (DOM['signup-form']) {
+    DOM['signup-form'].addEventListener('submit', (e) => {
+      e.preventDefault();
+      const username = (DOM['signup-username'] && DOM['signup-username'].value.trim()) || '';
+      const type = (DOM['signup-type'] && DOM['signup-type'].value) || 'none';
+      const contrast = DOM['signup-contrast']?.checked || false;
+      const reduced = DOM['signup-reduced']?.checked || false;
+      const font = DOM['signup-font']?.value || 'medium';
+      if (!username || username.length < 2) { alert('Please enter a valid username (2+ characters).'); return; }
+      const profile = {username, userType: type, uiPrefs: {contrast, fontSize: font, reduceMotion: reduced}, voiceEnabled: false};
+      saveProfile(profile);
+      // apply preferences
+      State.prefs = Object.assign(State.prefs, profile.uiPrefs);
+      savePrefs();
+      applyPrefsToUI();
+      closeModal('signup-modal');
+    });
+    if (DOM['signup-cancel']) DOM['signup-cancel'].addEventListener('click', ()=> closeModal('signup-modal'));
+  }
+
+  // back buttons (data-target attr)
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-target]');
+    if (!b) return;
+    const target = b.dataset.target;
+    if (target) showPage(target);
   });
 
-  // Signup form
-  const signupForm = document.getElementById('signup-form');
-  if (signupForm) signupForm.addEventListener('submit', (e)=>{
-    e.preventDefault();
-    const username = (dom['signup-username'] && dom['signup-username'].value.trim()) || '';
-    const usertype = (dom['signup-usertype'] && dom['signup-usertype'].value) || 'none';
-    if (!username || username.length < 2) {
-      alert(t('invalidUsername'));
-      return;
-    }
-    const pcontrast = (document.getElementById('pref-contrast') && document.getElementById('pref-contrast').checked) || false;
-    const pmotion = (document.getElementById('pref-reduce-motion') && document.getElementById('pref-reduce-motion').checked) || false;
-    const pfont = (document.getElementById('pref-font') && document.getElementById('pref-font').value) || 'medium';
-    const profile = {
-      username, userType: usertype, preferredLang: State.lang,
-      uiPrefs: { contrast: pcontrast, fontSize: pfont, reduceMotion: pmotion },
-      voiceEnabled: false
-    };
-    saveProfile(profile);
-    closeModal('signup-modal');
-    applyPrefs();
-    announce(t('profileSaved'));
-  });
-
-  // Voice toggle in blind flow
-  if (dom['voice-toggle']) dom['voice-toggle'].addEventListener('click', () => {
-    if (!State.profile) {
-      alert(t('loginReminder'));
-      return;
-    }
-    State.profile.voiceEnabled = !State.profile.voiceEnabled;
-    saveProfile(State.profile);
-    dom['voice-toggle'].textContent = State.profile.voiceEnabled ? t('disableVoice') : t('enableVoice');
-    announce(State.profile.voiceEnabled ? t('enableVoice') : t('disableVoice'));
-  });
-
-  // Blind STT / TTS controls
-  if (dom['stt-start']) dom['stt-start'].addEventListener('click', startRecognitionForSTT);
-  if (dom['stt-stop']) dom['stt-stop'].addEventListener('click', stopRecognition);
-  if (dom['stt-clear']) dom['stt-clear'].addEventListener('click', ()=> { if (dom['stt-input']) dom['stt-input'].value=''; });
-
-  if (dom['tts-speak']) dom['tts-speak'].addEventListener('click', () => {
-    const text = (dom['tts-input'] && dom['tts-input'].value) || (dom['stt-input'] && dom['stt-input'].value) || t('speakNow');
-    speakText(text);
-    addHistory({type:'tts', text});
-  });
-  if (dom['tts-stop']) dom['tts-stop'].addEventListener('click', stopSpeaking);
-  if (dom['tts-clear']) dom['tts-clear'].addEventListener('click', ()=> { if (dom['tts-input']) dom['tts-input'].value=''; });
-
-  // Deaf speech-to-sign
-  if (dom['stsign-start']) dom['stsign-start'].addEventListener('click', startRecognitionForSign);
-  if (dom['stsign-stop']) dom['stsign-stop'].addEventListener('click', stopRecognition);
-
-  // Sign-to-speech actions
-  if (dom['sign-palette']) dom['sign-palette'].addEventListener('click', (e) => {
-    const btn = e.target.closest('.sign');
-    if (!btn) return;
-    const word = btn.dataset.word;
-    appendSignToPhrase(word);
-  });
-  if (dom['s2s-speak']) dom['s2s-speak'].addEventListener('click', ()=> {
-    const phrase = dom['assembled-phrase'] && dom['assembled-phrase'].dataset.phrase || '';
-    if (!phrase) return alert(t('invalidUsername')); // reuse invalid prompt as generic notice (localized)
-    speakText(phrase);
-    addHistory({type:'s2s', text: phrase});
-    announce(t('phraseSpoken'));
-  });
-  if (dom['s2s-clear']) dom['s2s-clear'].addEventListener('click', ()=> {
-    if (dom['assembled-phrase']) {
-      dom['assembled-phrase'].textContent = '';
-      dom['assembled-phrase'].dataset.phrase = '';
-    }
-  });
-
-  // Keyboard nav hints (simple)
+  // keyboard global: Escape closes dialogs
   document.addEventListener('keydown', (e) => {
-    if (e.key === '?' || (e.shiftKey && e.key === '/')) {
-      alert('Keyboard hints:\nTab to move focus, Enter/Space to activate buttons\nUse arrow keys in sign palette.');
-    }
-    // Escape: global back if applicable
     if (e.key === 'Escape') {
-      if (State.historyStack.length > 0) {
-        const prev = State.historyStack.pop();
-        showPage(prev, { fromHistory: true });
-      } else {
-        showPage('home');
-      }
+      closeModal('login-modal'); closeModal('signup-modal');
     }
-  });
-
-  // Ripple effect for buttons
-  document.addEventListener('click', createRipple, true);
-
-  // Focus voice feedback if blind selected and voice enabled
-  document.addEventListener('focusin', (e) => {
-    if (State.profile && State.profile.userType === 'blind' && State.profile.voiceEnabled) {
-      const label = accessibleLabel(e.target);
-      if (label) speakText(label, {interrupt:true});
-    }
-  });
-
-  // Save language selector changes to localStorage on unload
-  window.addEventListener('beforeunload', ()=> {
-    try { localStorage.setItem('af_lang', State.lang); } catch(e){}
   });
 }
 
-/* ============
+/* ============================
    Modal helpers
-   ============ */
-function openModal(id){
+   ============================ */
+function openModal(id) {
   const dlg = document.getElementById(id);
   if (!dlg) return;
-  if (typeof dlg.showModal === 'function') {
-    dlg.showModal();
-  } else {
-    dlg.style.display = 'block';
-  }
-  dlg.querySelector('input, select, button')?.focus();
+  if (typeof dlg.showModal === 'function') dlg.showModal();
+  else dlg.style.display = 'block';
+  // focus first input
+  setTimeout(()=> dlg.querySelector('input,select,button')?.focus(), 120);
 }
-function closeModal(id){
+function closeModal(id) {
   const dlg = document.getElementById(id);
   if (!dlg) return;
   if (typeof dlg.close === 'function') dlg.close();
   else dlg.style.display = 'none';
 }
 
-/* ============
-   Language System
-   ============ */
-function setLang(code){
-  State.lang = code === 'am' ? 'am' : 'en';
-  document.documentElement.lang = State.lang === 'am' ? 'am' : 'en';
-  localStorage.setItem('af_lang', State.lang);
-  // If user profile exists, persist preferredLang
-  if (State.profile) {
-    State.profile.preferredLang = State.lang;
-    try { localStorage.setItem('af_profile', JSON.stringify(State.profile)); } catch(e){}
-  }
-  translateAll();
-  // Update speech recognition & synthesis languages
-  updateSpeechLangs();
-  announce(t('prefsSaved'));
-}
+/* ============================
+   Speech: TTS & STT
+   ============================ */
 
-/* Update Web Speech API language settings after a language change */
-function updateSpeechLangs(){
-  if (State.recognition) {
-    try {
-      State.recognition.lang = State.lang === 'am' ? 'am-ET' : 'en-US';
-    } catch(e){}
-  }
-}
-
-/* ============
-   Profiles & Preferences Persistence
-   ============ */
-function saveProfile(profile){
-  State.profile = profile;
-  try { localStorage.setItem('af_profile', JSON.stringify(profile)); } catch(e){}
-  // Merge prefs too
-  if (profile.uiPrefs) {
-    State.prefs = Object.assign(State.prefs, profile.uiPrefs);
-    savePrefs();
-    applyPrefs();
-  }
-}
-function savePrefs(){
-  try { localStorage.setItem('af_prefs', JSON.stringify(State.prefs)); } catch(e){}
-}
-function resetPrefs(){
-  State.prefs = { contrast:false, fontSize:'medium', reduceMotion:false, demo:false };
-  savePrefs();
-  applyPrefs();
-  if (dom['contrast-toggle']) dom['contrast-toggle'].checked = false;
-  if (dom['font-size']) dom['font-size'].value = 'medium';
-  if (dom['reduced-motion']) dom['reduced-motion'].checked = false;
-  if (dom['demo-mode']) dom['demo-mode'].checked = false;
-  announce(t('prefsReset'));
-}
-
-/* ============
-   Continue as Guest
-   ============ */
-function continueAsGuest(){
-  State.profile = {
-    username: 'Guest',
-    userType: 'none',
-    preferredLang: State.lang,
-    uiPrefs: State.prefs,
-    voiceEnabled: false
-  };
-  localStorage.setItem('af_profile', JSON.stringify(State.profile));
-  announce(`${t('continueGuest')} ${State.profile.username}`);
-  showPage('access-choice');
-}
-
-/* ============
-   Speech (TTS & STT) Initialization & helpers
-   ============ */
-
-function initSpeech(){
-  State.speechSupported = 'speechSynthesis' in window;
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
-  if (SpeechRecognition) {
-    try {
-      State.recognition = new SpeechRecognition();
-      State.recognition.continuous = false;
-      State.recognition.interimResults = false;
-      State.recognition.lang = State.lang === 'am' ? 'am-ET' : 'en-US';
-      State.recognition.onresult = onSpeechResult;
-      State.recognition.onend = ()=> {
-        State.recognitionActive = false;
-        announce(t('recognitionStop'));
-      };
-      State.recognition.onerror = (ev)=> {
-        console.warn('Recognition error', ev);
-      };
-    } catch(e){
-      State.recognition = null;
-    }
-  }
-  if (!State.speechSupported && !State.recognition) {
-    announce(t('speechNotSupported'));
-  }
-}
-
-/* STT for blind flow */
-function startRecognitionForSTT(){
-  if (!State.recognition) return announce(t('speechNotSupported'));
-  if (State.recognitionActive) return;
-  // restore handler
-  State.recognition.onresult = onSpeechResult;
-  State.recognition.lang = State.lang === 'am' ? 'am-ET' : 'en-US';
-  try {
-    State.recognition.start();
-    State.recognitionActive = true;
-    announce(t('recognitionStart'));
-  } catch(e){
-    console.warn(e);
-    announce(t('speechNotSupported'));
-  }
-}
-
-/* STT for sign flow - override onresult to produce sign output */
-function startRecognitionForSign(){
-  if (!State.recognition) return announce(t('speechNotSupported'));
-  if (State.recognitionActive) return;
-  State.recognition.lang = State.lang === 'am' ? 'am-ET' : 'en-US';
-  State.recognition.onresult = (ev) => {
-    const text = ev.results[0][0].transcript;
-    simulateSpeechToSign(text);
-  };
-  try {
-    State.recognition.start();
-    State.recognitionActive = true;
-    announce(t('recognitionStart'));
-  } catch(e){
-    console.warn(e);
-    announce(t('speechNotSupported'));
-  }
-}
-
-function stopRecognition(){
-  if (State.recognition && State.recognitionActive) {
-    try { State.recognition.stop(); } catch(e){}
-    State.recognitionActive = false;
-  }
-}
-
-/* Speech result handler for STT */
-function onSpeechResult(ev){
-  const text = ev.results[0][0].transcript;
-  if (dom['stt-input']) dom['stt-input'].value = text;
-  addHistory({type:'stt', text});
-}
-
-/* TTS convenience */
-function speakText(text, opts = {}) {
-  if (!('speechSynthesis' in window)) {
-    announce(t('speechNotSupported'));
-    return;
-  }
+/* TTS */
+function speak(text, opts = {}) {
+  if (!('speechSynthesis' in window)) { alert('Speech synthesis not supported.'); return; }
   if (!text) return;
   try {
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = State.lang === 'am' ? 'am-ET' : 'en-US';
     if (opts.interrupt) window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utter);
-  } catch(e){
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-US';
+    // voice selection fallback
+    const voices = window.speechSynthesis.getVoices();
+    if (voices && voices.length) {
+      // try to pick a neutral English voice
+      u.voice = voices.find(v => v.lang && v.lang.startsWith('en')) || voices[0];
+    }
+    window.speechSynthesis.speak(u);
+  } catch (e) {
     console.warn('TTS error', e);
   }
 }
+function stopSpeaking() { if ('speechSynthesis' in window) window.speechSynthesis.cancel(); }
 
-/* Stop speaking */
-function stopSpeaking(){
-  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-}
-
-/* Accessible label extraction for focus feedback */
-function accessibleLabel(el){
-  if (!el) return '';
-  if (el.getAttribute && el.getAttribute('aria-label')) return el.getAttribute('aria-label');
-  if (el.getAttribute && el.getAttribute('aria-labelledby')) {
-    const id = el.getAttribute('aria-labelledby');
-    const node = document.getElementById(id);
-    if (node) return node.textContent;
+/* STT (SpeechRecognition) */
+function initSpeechRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  if (!SpeechRecognition) {
+    console.warn('SpeechRecognition not supported');
+    return;
   }
-  if (el.textContent && el.textContent.trim().length) return el.textContent.trim();
-  if (el.value) return el.value;
-  return '';
+  try {
+    State.speech.recognition = new SpeechRecognition();
+    State.speech.recognition.lang = 'en-US';
+    State.speech.recognition.interimResults = false;
+    State.speech.recognition.onresult = (ev) => {
+      const text = ev.results[0][0].transcript;
+      if (DOM['stt-output']) DOM['stt-output'].value = text;
+      pushHistory({type:'stt', text});
+      announce('Speech recognized');
+    };
+    State.speech.recognition.onstart = ()=> { State.speech.recognizing = true; announce('Listening...'); };
+    State.speech.recognition.onend = ()=> { State.speech.recognizing = false; announce('Stopped listening'); };
+    State.speech.recognition.onerror = (e)=> { console.warn('Recognition error', e); announce('Recognition error'); };
+  } catch (e) {
+    console.warn('Init recognition failed', e);
+  }
 }
 
-/* ============
-   Deaf Flow Simulation (Sign UI)
-   ============ */
-function simulateSpeechToSign(text){
-  const out = dom['stsign-output'];
-  if (!out) return;
-  out.innerHTML = '';
-  const words = text.split(/\s+/).slice(0,12);
-  words.forEach(w => {
-    const card = document.createElement('div');
-    card.className = 'sign-card';
-    card.style.display = 'inline-block';
-    card.style.margin = '0.25rem';
-    card.style.padding = '0.5rem 0.6rem';
-    card.style.borderRadius = '8px';
-    card.style.background = 'rgba(255,255,255,0.6)';
-    card.style.border = '1px solid rgba(0,0,0,0.04)';
-    // map basic words to emoji - include Amharic mapping
-    let emoji = '🤟';
-    if (State.lang === 'am') {
-      const mapAm = I18N.am.signPaletteEmoji || {};
-      // attempt to match direct word or common romanization
-      emoji = mapAm[w] || mapAm[w.toLowerCase()] || '🤟';
-    } else {
-      const mapEn = I18N.en.signPaletteEmoji || {};
-      emoji = mapEn[w] || mapEn[w.toLowerCase()] || '🤟';
-    }
-    card.innerHTML = `<div style="font-size:1.4rem">${emoji}</div><div style="font-size:0.85rem; color:var(--muted)">${w}</div>`;
-    out.appendChild(card);
+function startSpeechRecognition() {
+  if (!State.speech.recognition) { alert('Speech recognition not supported in this browser.'); return; }
+  try { State.speech.recognition.start(); } catch(e){ console.warn(e); }
+}
+function stopSpeechRecognition() {
+  if (State.speech.recognition) try { State.speech.recognition.stop(); } catch(e) {}
+}
+
+/* ============================
+   Sign-to-Speech (palette) helpers
+   ============================ */
+
+const DEFAULT_SIGNS = [
+  {key:'Hello', emoji:'👋'},
+  {key:'Yes', emoji:'👍'},
+  {key:'No', emoji:'👎'},
+  {key:'Thank you', emoji:'🙏'},
+  {key:'Help', emoji:'🆘'},
+  {key:'Good', emoji:'🌟'}
+];
+
+function populateSignPalette() {
+  const palette = DOM['sign-palette'];
+  if (!palette) return;
+  palette.innerHTML = '';
+  DEFAULT_SIGNS.forEach(s => {
+    const btn = document.createElement('button');
+    btn.className = 'sign-btn';
+    btn.type = 'button';
+    btn.dataset.sign = s.key;
+    btn.innerHTML = `${s.emoji} <span class="sign-label">${s.key}</span>`;
+    btn.setAttribute('aria-label', `Sign ${s.key}`);
+    palette.appendChild(btn);
   });
-  addHistory({type:'stsign', text});
 }
 
-/* Assemble selected signs to phrase */
-function appendSignToPhrase(word){
-  const el = dom['assembled-phrase'];
+function appendToPhrase(word) {
+  const el = DOM['assembled-phrase'];
   if (!el) return;
-  const cur = el.dataset.phrase || '';
-  const next = cur ? (cur + ' ' + word) : word;
-  el.dataset.phrase = next;
-  el.textContent = next;
+  if (!el.textContent || el.textContent.trim() === '') el.textContent = word;
+  else el.textContent = (el.textContent.trim() + ' ' + word);
 }
 
-/* ============
-   Reminders System
-   ============ */
-function initReminder(){
-  if (State.reminderIntervalId) clearInterval(State.reminderIntervalId);
-  State.reminderIntervalId = setInterval(()=> {
-    showLoginReminder();
-  }, State.reminderMs);
+/* ============================
+   Handsign (TensorFlow) integration + Camera
+   ============================ */
+
+/*
+  Integration approach:
+  - Try to use the Handsign library (loaded via script tag).
+  - If available, call the library's initializer. Since external library API may vary,
+    we attempt common calls and fallback gracefully.
+  - If unavailable or fails, we fallback to simple simulated detection (periodic random picks)
+    but still provide a camera preview.
+*/
+
+async function initHandsignIfAvailable(){
+  // Wait a bit for tf/handsign scripts to load
+  await new Promise(res => setTimeout(res, 300));
+  // If handsign library exposes a known global, try to initialize with model URL
+  try {
+    // Example: some libs set window.HandSign, window.handsign, window.HandSignModel
+    const HS = window.handsign || window.HandSign || window.HandSignModel || window.HandSignTensor;
+    if (HS && typeof HS === 'object') {
+      // If library provides an async init, call it
+      if (HS.init && typeof HS.init === 'function') {
+        try {
+          await HS.init(State.handsign.modelUrl);
+          State.handsign.detector = HS;
+          State.handsign.enabled = true;
+          State.handsign.initialized = true;
+          console.info('Handsign library initialized (object API)');
+          return;
+        } catch (err) { console.warn('HS.init failed', err); }
+      }
+      // otherwise, if it provides loadModel
+      if (HS.loadModel && typeof HS.loadModel === 'function') {
+        try {
+          State.handsign.detector = await HS.loadModel(State.handsign.modelUrl);
+          State.handsign.enabled = true;
+          State.handsign.initialized = true;
+          console.info('Handsign model loaded via loadModel');
+          return;
+        } catch (err) { console.warn('HS.loadModel failed', err); }
+      }
+    }
+    // Another attempt: if tf is present, try to load model directly (best-effort)
+    if (window.tf && window.tf.loadGraphModel) {
+      try {
+        const model = await window.tf.loadGraphModel(State.handsign.modelUrl);
+        State.handsign.detector = model;
+        State.handsign.enabled = true;
+        State.handsign.initialized = true;
+        console.info('Handsign model loaded via tf.loadGraphModel (generic)');
+        return;
+      } catch (err) {
+        console.warn('tf.loadGraphModel failed', err);
+      }
+    }
+  } catch (e) {
+    console.warn('Handsign initialization error', e);
+  }
+  // If we reach here, no model available — disable camera detection but allow manual sign palette
+  State.handsign.enabled = false;
+  State.handsign.initialized = false;
+  console.info('Handsign not available; camera detection will fallback to simulation');
 }
 
-function showLoginReminder(){
-  const profile = State.profile || JSON.parse(localStorage.getItem('af_profile') || 'null');
-  if (profile && profile.username && profile.username !== 'Guest') return;
-  const text = t('loginReminder');
-  showTransientAlert(text);
-  if (profile && profile.userType === 'blind' && profile.voiceEnabled) speakText(text);
-  if (profile && profile.userType === 'deaf') showSignReminder();
+/* Camera start/stop + detection loop */
+async function startHandsignDetection() {
+  if (State.handsign.streaming) return;
+  // request camera
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}, audio:false});
+    const video = DOM['camera-video'];
+    video.srcObject = stream;
+    State.handsign.videoStream = stream;
+    State.handsign.streaming = true;
+    DOM['camera-status'].textContent = 'Camera active';
+    announce('Camera started for sign detection');
+    // if we have a real detector, start inference loop; else simulate
+    if (State.handsign.initialized && State.handsign.enabled && State.handsign.detector) {
+      runDetectionLoopReal();
+    } else {
+      runDetectionLoopSimulated();
+    }
+  } catch (e) {
+    console.warn('Camera error', e);
+    DOM['camera-status'].textContent = 'Camera unavailable';
+    alert('Unable to access camera. Please allow camera permissions or use manual sign palette.');
+  }
 }
 
-/* Small transient visual alert */
-function showTransientAlert(text){
+function stopHandsignDetection(){
+  if (!State.handsign.streaming) return;
+  if (State.handsign.videoStream) {
+    State.handsign.videoStream.getTracks().forEach(t => t.stop());
+    State.handsign.videoStream = null;
+  }
+  State.handsign.streaming = false;
+  DOM['camera-status'].textContent = 'Camera stopped';
+  DOM['detected-sign'].textContent = 'No sign detected';
+  announce('Camera stopped');
+  // cancel any loops by flipping streaming flag — loops check this flag
+}
+
+/* Real detection loop — best-effort using detector interface */
+async function runDetectionLoopReal(){
+  const video = DOM['camera-video'];
+  const canvas = DOM['camera-canvas'];
+  const ctx = canvas.getContext('2d');
+  // ensure canvas matches video
+  function resizeCanvas() {
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+  }
+  // Wait for video to be ready
+  await new Promise(res => {
+    if (video.readyState >= 2) return res();
+    video.onloadeddata = () => res();
+  });
+  resizeCanvas();
+
+  // detection loop
+  async function loop() {
+    if (!State.handsign.streaming) return;
+    try {
+      // draw frame
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      // extract tensor from canvas
+      if (window.tf && State.handsign.detector && typeof State.handsign.detector.executeAsync === 'function') {
+        // Best-effort attempt: convert canvas to tensor and run model
+        const img = tf.browser.fromPixels(canvas).expandDims(0).toFloat().div(255);
+        const result = await State.handsign.detector.executeAsync(img);
+        // Interpret result into a 'label' — model-specific; attempt to extract names
+        let label = null;
+        try {
+          // Some models return logits or probabilities. We'll try to find a top label if present.
+          if (Array.isArray(result) && result.length) {
+            // search for a tensor that looks like label indices/probs
+            for (const r of result) {
+              if (r.arraySync) {
+                const arr = await r.array();
+                // flatten and find top index
+                const flat = arr.flat ? arr.flat() : arr;
+                if (flat && flat.length && typeof flat[0] === 'number') {
+                  const maxIdx = flat.indexOf(Math.max(...flat));
+                  label = `Sign(${maxIdx})`;
+                  break;
+                }
+              }
+            }
+          } else if (result.array) {
+            const arr = await result.array();
+            const flat = arr.flat ? arr.flat() : arr;
+            const maxIdx = flat.indexOf(Math.max(...flat));
+            label = `Sign(${maxIdx})`;
+          }
+        } catch (e) {
+          console.warn('Interpreting model result failed', e);
+          label = null;
+        }
+        tf.dispose(img);
+        if (!label) label = 'Sign detected';
+        DOM['detected-sign'].textContent = label;
+        pushHistory({type:'stsign', text: label});
+      } else if (State.handsign.detector && State.handsign.detector.predict) {
+        // some libs expose predict(image)
+        const prediction = await State.handsign.detector.predict(canvas);
+        const label = prediction?.label || prediction?.class || JSON.stringify(prediction);
+        DOM['detected-sign'].textContent = label || 'Sign detected';
+        pushHistory({type:'stsign', text: label});
+      } else {
+        // fallback: show generic detection
+        DOM['detected-sign'].textContent = 'Sign detected';
+      }
+    } catch (err) {
+      console.warn('Detection loop error', err);
+      DOM['detected-sign'].textContent = 'Detection error';
+    }
+    // schedule next
+    setTimeout(()=> {
+      if (State.handsign.streaming) requestAnimationFrame(loop);
+    }, 200); // small throttle
+  }
+  loop();
+}
+
+/* Simulated detection loop when model unavailable */
+function runDetectionLoopSimulated(){
+  const video = DOM['camera-video'];
+  // simple loop that samples frames and randomly "detects" a sign (for demo)
+  const choices = DEFAULT_SIGNS.map(s => s.key);
+  async function loop() {
+    if (!State.handsign.streaming) return;
+    // draw simple overlay for feel
+    const canvas = DOM['camera-canvas'];
+    const ctx = canvas.getContext('2d');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(8,8,canvas.width-16,canvas.height-16);
+    // every 1.5s pick a random sign to show
+    const sign = choices[Math.floor(Math.random()*choices.length)];
+    DOM['detected-sign'].textContent = sign;
+    pushHistory({type:'stsign', text: sign});
+    await new Promise(res => setTimeout(res, 1500));
+    if (State.handsign.streaming) requestAnimationFrame(loop);
+  }
+  loop();
+}
+
+/* ============================
+   Reminders & Demo Mode
+   ============================ */
+
+function startReminders() {
+  // 3 minutes (180000 ms) reminder
+  if (State.reminderInterval) clearInterval(State.reminderInterval);
+  State.reminderInterval = setInterval(() => {
+    const profile = State.profile || null;
+    const text = 'Please log in to save your progress.';
+    // Visual banner
+    showTransientBanner(text);
+    // If blind user + voice enabled
+    if (profile && profile.userType === 'blind' && profile.voiceEnabled) speak(text, {interrupt:true});
+    // Deaf visual sign (simple card)
+    if (profile && profile.userType === 'deaf') showSignReminder(text);
+  }, 180000);
+}
+
+function showTransientBanner(msg) {
   const div = document.createElement('div');
-  div.className = 'transient-alert';
-  div.textContent = text;
-  div.style.position='fixed';
-  div.style.bottom='1rem';
-  div.style.right='1rem';
-  div.style.background='linear-gradient(90deg,#ffdede,#fff4e6)';
-  div.style.padding='0.7rem 1rem';
-  div.style.borderRadius='10px';
-  div.style.boxShadow='0 8px 30px rgba(0,0,0,0.08)';
-  div.style.zIndex=9999;
+  div.className = 'transient-banner';
+  div.style.position = 'fixed';
+  div.style.right = '1rem';
+  div.style.bottom = '1rem';
+  div.style.background = 'linear-gradient(90deg,#fff7f2,#eef2ff)';
+  div.style.border = '1px solid rgba(0,0,0,0.06)';
+  div.style.padding = '0.8rem 1rem';
+  div.style.borderRadius = '10px';
+  div.style.boxShadow = '0 8px 30px rgba(0,0,0,0.08)';
+  div.textContent = msg;
   document.body.appendChild(div);
-  setTimeout(()=> div.style.opacity='0', 5200);
+  setTimeout(()=> { div.style.opacity = '0'; div.style.transition = 'opacity 400ms'; }, 5200);
   setTimeout(()=> div.remove(), 6000);
 }
 
-/* Visual sign reminder for deaf users */
-function showSignReminder(){
+function showSignReminder(msg) {
   const div = document.createElement('div');
   div.className = 'sign-reminder';
-  div.style.position='fixed';
-  div.style.bottom='1rem';
-  div.style.left='1rem';
-  div.style.padding='0.6rem 0.8rem';
-  div.style.borderRadius='10px';
-  div.style.background='rgba(255,255,255,0.9)';
-  div.style.zIndex=9999;
-  div.style.boxShadow='0 8px 30px rgba(0,0,0,0.06)';
-  div.innerHTML = `<div style="font-size:1.2rem">🤟</div><div style="font-size:0.9rem">${t('loginReminder')}</div>`;
+  div.style.position = 'fixed';
+  div.style.left = '1rem';
+  div.style.bottom = '1rem';
+  div.style.background = 'rgba(255,255,255,0.95)';
+  div.style.border = '1px solid rgba(0,0,0,0.06)';
+  div.style.padding = '0.6rem 0.8rem';
+  div.style.borderRadius = '10px';
+  div.style.boxShadow = '0 8px 30px rgba(0,0,0,0.06)';
+  div.innerHTML = `<div style="font-size:20px">🤟</div><div style="margin-top:4px">${msg}</div>`;
   document.body.appendChild(div);
   setTimeout(()=> div.remove(), 6000);
 }
 
-/* ============
-   Interaction History
-   ============ */
-function addHistory(item){
-  const h = JSON.parse(localStorage.getItem(State.sttHistoryKey) || '[]');
-  h.unshift(Object.assign({timestamp: Date.now()}, item));
-  localStorage.setItem(State.sttHistoryKey, JSON.stringify(h.slice(0,100)));
-  renderHistory();
-}
-function loadHistory(){
-  renderHistory();
-}
-function renderHistory(){
-  const h = JSON.parse(localStorage.getItem(State.sttHistoryKey) || '[]');
-  const blindList = dom['history-list-blind'];
-  const deafList = dom['history-list-deaf'];
-  if (blindList) {
-    blindList.innerHTML = '';
-    h.filter(it => it.type === 'stt' || it.type === 'tts' || it.type === 'stsign').slice(0,20).forEach(it => {
-      const li = document.createElement('li');
-      li.textContent = `${new Date(it.timestamp).toLocaleTimeString()} — ${it.type}: ${it.text}`;
-      blindList.appendChild(li);
-    });
+/* Demo mode: cycles through features gently */
+function startDemoMode() {
+  if (State.demoTimer) clearTimeout(State.demoTimer);
+  let steps = [
+    ()=> { showPage('access-choice'); },
+    ()=> { document.getElementById('choose-blind').focus(); },
+    ()=> { showPage('blind-flow'); },
+    ()=> { if (DOM['blind-tts']) { DOM['blind-tts'].value = 'Hello from demo mode'; DOM['blind-tts-speak'].click(); } },
+    ()=> { showPage('deaf-flow'); },
+    ()=> { startHandsignDetection(); },
+    ()=> { stopHandsignDetection(); showPage('home'); }
+  ];
+  let idx = 0;
+  function runStep() {
+    if (idx >= steps.length) { announce('Demo complete'); stopDemoMode(); return; }
+    try { steps[idx](); } catch(e){ console.warn('Demo step error', e); }
+    idx++;
+    State.demoTimer = setTimeout(runStep, 1600);
   }
-  if (deafList) {
-    deafList.innerHTML = '';
-    h.filter(it => it.type === 'stsign' || it.type === 's2s').slice(0,20).forEach(it => {
-      const li = document.createElement('li');
-      li.textContent = `${new Date(it.timestamp).toLocaleTimeString()} — ${it.type}: ${it.text}`;
-      deafList.appendChild(li);
-    });
-  }
+  announce('Demo starting');
+  runStep();
 }
 
-/* ============
-   Demo Mode
-   ============ */
-let demoTimer = null;
-function maybeStartDemo(){
-  if (State.prefs.demo) startDemo();
-  else stopDemo();
-}
-function startDemo(){
-  if (demoTimer) clearInterval(demoTimer);
-  let step = 0;
-  announce(t('demoStart'));
-  demoTimer = setInterval(()=> {
-    step++;
-    switch(step){
-      case 1: showPage('access-choice'); break;
-      case 2: document.getElementById('btn-blind').focus(); break;
-      case 3: showPage('blind-flow'); break;
-      case 4:
-        if (dom['tts-input']) dom['tts-input'].value = State.lang==='am' ? 'ሰላም እንዴት ነህ' : 'Hello, how are you?';
-        if (dom['tts-speak']) dom['tts-speak'].click();
-        break;
-      case 5: showPage('deaf-flow'); break;
-      case 6: simulateSpeechToSign('Hello thank you help'); break;
-      case 7: showPage('home'); break;
-      case 8: announce(t('demoEnd')); stopDemo(); break;
-      default: stopDemo();
-    }
-  }, 1800);
-}
-function stopDemo(){
-  if (demoTimer) clearInterval(demoTimer);
-  demoTimer = null;
-  State.prefs.demo = false;
-  if (dom['demo-mode']) dom['demo-mode'].checked = false;
-  savePrefs();
+function stopDemoMode() {
+  if (State.demoTimer) clearTimeout(State.demoTimer);
+  State.demoTimer = null;
 }
 
-/* ============
-   Misc Helpers
-   ============ */
-function announce(msg){
-  if (!msg) return;
-  if (dom['aria-live']) dom['aria-live'].textContent = msg;
-  if (State.profile && State.profile.userType === 'blind' && State.profile.voiceEnabled) speakText(msg);
+/* ============================
+   Utility: continue as guest
+   ============================ */
+function continueAsGuest() {
+  const guest = {username:'Guest', userType:'none', uiPrefs:Object.assign({}, State.prefs), voiceEnabled:false};
+  saveProfile(guest);
+  announce('Continuing as Guest');
+  showPage('access-choice');
 }
 
-/* Ripple */
-function createRipple(e){
-  const btn = e.target.closest('.btn');
-  if (!btn) return;
-  const circle = document.createElement('span');
-  circle.className = 'ripple-circle';
-  const rect = btn.getBoundingClientRect();
-  const size = Math.max(rect.width, rect.height) * 0.9;
-  circle.style.width = circle.style.height = size + 'px';
-  circle.style.left = (e.clientX - rect.left - size/2) + 'px';
-  circle.style.top = (e.clientY - rect.top - size/2) + 'px';
-  btn.appendChild(circle);
-  setTimeout(()=> circle.remove(), 700);
-}
+/* ============================
+   Finishing touches & safety
+   ============================ */
 
-/* Year */
-function populateYear(){
-  if (dom['year']) dom['year'].textContent = new Date().getFullYear();
-}
-
-/* Ensure access option clicks preserve history and set profile type */
-document.addEventListener('DOMContentLoaded', () => {
-  const btnB = document.getElementById('btn-blind');
-  const btnD = document.getElementById('btn-deaf');
-  if (btnB) btnB.addEventListener('click', (e)=>{
-    if (!State.profile) continueAsGuest();
-    State.profile.userType = 'blind';
-    saveProfile(State.profile);
-    showPage('blind-flow');
-  });
-  if (btnD) btnD.addEventListener('click', (e)=>{
-    if (!State.profile) continueAsGuest();
-    State.profile.userType = 'deaf';
-    saveProfile(State.profile);
-    showPage('deaf-flow');
-  });
+// Speak detected-sign when pressing speak-detected (bound above)
+if (DOM['speak-detected']) DOM['speak-detected'].addEventListener && DOM['speak-detected'].addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); DOM['speak-detected'].click(); }
 });
 
-/* Graceful handlers for unsupported features */
-window.addEventListener('error', (e) => {
-  console.warn('Runtime error', e.message);
+// Ensure history rendered initially
+renderHistory();
+
+// warn user when leaving with unsaved data (soft)
+window.addEventListener('beforeunload', (e) => {
+  // keep light; no blocking by default
 });
+
+/* ============================
+   End of script
+   ============================ */
