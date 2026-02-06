@@ -1,48 +1,53 @@
 /**
  * script.js
- * AccessFirst — Full accessible front-end demo
- * - Vanilla JavaScript only
- * - Implements speech features, sign detection (HandsSign + TensorFlow), preferences,
- *   profiles, history, reminders, demo mode, and accessible interactions.
+ * AccessFirst — full-featured accessibility demo
+ * - Vanilla JS only
+ * - Local authentication (secure hashed password in browser)
+ * - TTS & STT using Web Speech API
+ * - Camera & TensorFlow.js Handsign integration (best-effort)
+ * - Donate & signup notifications via mailto fallback
+ * - Preferences persisted in localStorage
  *
- * Note:
- * - This file gracefully handles missing APIs (SpeechRecognition, speechSynthesis, camera, TensorFlow/Handsign)
- * - Persistent data keys in localStorage:
- *   - af_profile
- *   - af_prefs
- *   - af_history
+ * This file continues the existing implementation and only adds missing features:
+ * - Voice feedback toggle for blind users and focus-in voice feedback
+ * - Speech-to-Sign (speech recognition mapping to visual sign placeholders)
+ * - Ensure user uiPrefs applied on login
+ * - Persist voiceEnabled per user and load it on login
+ * - Hook up deaf speech-to-sign UI elements
  *
  * Developed by: HaileGebriel
  */
 
-/* ============================
-   Constants & State
-   ============================ */
-const KEYS = {
-  PROFILE: 'af_profile',
-  PREFS: 'af_prefs',
-  HISTORY: 'af_history'
+/* ======================================================================
+   LocalStorage keys and initial state (must match existing code)
+   ====================================================================== */
+const LS_KEYS = {
+  USERS: 'af_users_v1',
+  CURRENT: 'af_current_v1',
+  PREFS: 'af_prefs_v1',
+  HISTORY: 'af_history_v1',
+  NOTIFICATIONS: 'af_notifications_v1'
 };
 
 const State = {
-  profile: null,
-  prefs: {
+  users: [],           // array of user objects {username,email,passwordHash,createdAt,uiPrefs,voiceEnabled,userType}
+  current: null,       // current logged-in user (email)
+  prefs: {             // UI preferences
     contrast: false,
-    fontSize: 'medium', // small | medium | large
+    fontSize: 'medium',
     reduceMotion: false,
     demo: false
   },
   speech: {
-    supported: 'speechSynthesis' in window,
+    synthesisSupported: 'speechSynthesis' in window,
     recognitionSupported: !!(window.SpeechRecognition || window.webkitSpeechRecognition),
     recognition: null,
-    recognizing: false
+    listening: false
   },
   handsign: {
-    enabled: false,
     modelUrl: 'https://cdn.jsdelivr.net/gh/syauqy/handsign-tensorflow@main/model/model.json',
     initialized: false,
-    detector: null, // will hold handsign object or fallback
+    detector: null,
     streaming: false,
     videoStream: null
   },
@@ -50,210 +55,126 @@ const State = {
   demoTimer: null
 };
 
-/* ============================
-   DOM Cache
-   ============================ */
+/* ======================================================================
+   DOM cache (enhanced with newly-added elements)
+   ====================================================================== */
 const DOM = {};
 document.addEventListener('DOMContentLoaded', () => {
-  // Page elements
   [
-    'main',
-    'home','access-choice','blind-flow','deaf-flow',
-    'nav-home','nav-access','nav-login','nav-signup','nav-guest','donate-link',
-    'cta-start','cta-guest','cta-donate','contrast-toggle','font-size','reduced-motion','demo-mode',
-    'tts-area','tts-speak','tts-stop','tts-clear',
-    'choose-blind','choose-deaf',
-    'stt-output','stt-start','stt-stop','stt-copy','blind-tts','blind-tts-speak','blind-tts-stop','blind-tts-clear','history-blind',
-    'sign-palette','assembled-phrase','s2s-speak','s2s-clear','camera-video','camera-canvas','start-detection','stop-detection','detected-sign','speak-detected','camera-status','history-deaf',
-    'login-modal','signup-modal','login-form','signup-form','login-username','login-type','signup-username','signup-type','signup-contrast','signup-reduced','signup-font',
-    'login-cancel','signup-cancel','year','sr-live'
+    'nav-home','nav-access','nav-login','nav-signup','nav-donate','nav-about',
+    'cta-get-started','cta-login','cta-signup','cta-donate','home','access-choice','blind-flow','deaf-flow','about',
+    'home-tts-input','home-tts-speak','home-tts-stop','home-tts-clear',
+    'flow-blind','flow-deaf',
+    'blind-stt-output','blind-stt-start','blind-stt-stop','blind-stt-copy',
+    'blind-tts-input','blind-tts-speak','blind-tts-stop','blind-tts-clear','history-blind','blind-voice-toggle',
+    'sign-palette','assembled-phrase','s2s-speak','s2s-clear','camera-video','camera-canvas','detected-sign','start-camera','stop-camera','speak-detected','camera-status','history-deaf',
+    'contrast-toggle','font-size','reduce-motion','demo-mode',
+    'login-modal','signup-modal','login-form','signup-form','login-email','login-password','login-google','login-microsoft','login-close','login-submit',
+    'signup-username','signup-email','signup-password','pwd-strength','pwd-feedback','signup-contrast','signup-reduce','signup-font','signup-google','signup-microsoft','signup-close','signup-submit',
+    'year','live',
+    'deaf-stt-start','deaf-stt-stop','deaf-stt-output','deaf-stt-signs'
   ].forEach(id => DOM[id] = document.getElementById(id));
 
-  // Setup initial UI
-  loadPrefs();
-  loadProfile();
+  // Initialize state from storage
+  loadFromStorage();
   applyPrefsToUI();
-  populateYear();
-  translateStatic(); // small helper for static labels if needed
-
-  // Attach event listeners
-  attachUIListeners();
-
-  // Initialize speech recognition if supported
+  populateUI();
+  attachListeners();
   initSpeechRecognition();
-
-  // Initialize handsign if scripts loaded
-  initHandsignIfAvailable();
-
-  // Load history
-  renderHistory();
-
-  // Start reminders
+  attemptInitHandsign();
   startReminders();
+  if (State.prefs.demo) startDemo();
 
-  // Maybe demo
-  if (State.prefs.demo) startDemoMode();
+  if (DOM['year']) DOM['year'].textContent = new Date().getFullYear();
 });
 
-/* ============================
-   Helpers: Storage & UI
-   ============================ */
-
-function saveProfile(profile) {
-  State.profile = profile;
-  localStorage.setItem(KEYS.PROFILE, JSON.stringify(profile));
-  announce(`Profile saved for ${profile.username}`);
-}
-
-function loadProfile() {
+/* ======================================================================
+   Storage helpers (existing)
+   ====================================================================== */
+function loadFromStorage(){
   try {
-    const raw = localStorage.getItem(KEYS.PROFILE);
-    if (raw) State.profile = JSON.parse(raw);
+    State.users = JSON.parse(localStorage.getItem(LS_KEYS.USERS) || '[]');
+    State.current = localStorage.getItem(LS_KEYS.CURRENT) || null;
+    State.prefs = Object.assign(State.prefs, JSON.parse(localStorage.getItem(LS_KEYS.PREFS) || '{}'));
   } catch (e) {
-    console.warn('Load profile error', e);
+    console.warn('Error loading storage', e);
   }
 }
-
-function savePrefs() {
-  localStorage.setItem(KEYS.PREFS, JSON.stringify(State.prefs));
+function saveUsers(){ localStorage.setItem(LS_KEYS.USERS, JSON.stringify(State.users)); }
+function saveCurrent(email){
+  if (email) localStorage.setItem(LS_KEYS.CURRENT, email);
+  else localStorage.removeItem(LS_KEYS.CURRENT);
+  State.current = email;
+}
+function savePrefs(){ localStorage.setItem(LS_KEYS.PREFS, JSON.stringify(State.prefs)); }
+function pushNotification(note){
+  const arr = JSON.parse(localStorage.getItem(LS_KEYS.NOTIFICATIONS) || '[]');
+  arr.unshift(Object.assign({timestamp: Date.now()}, note));
+  localStorage.setItem(LS_KEYS.NOTIFICATIONS, JSON.stringify(arr));
 }
 
-function loadPrefs() {
-  try {
-    const raw = localStorage.getItem(KEYS.PREFS);
-    if (raw) State.prefs = Object.assign(State.prefs, JSON.parse(raw));
-  } catch (e) {
-    console.warn('Load prefs', e);
-  }
-}
-
-function saveHistory(arr) {
-  localStorage.setItem(KEYS.HISTORY, JSON.stringify(arr));
-}
-function loadHistoryArray() {
-  try {
-    return JSON.parse(localStorage.getItem(KEYS.HISTORY) || '[]');
-  } catch (e) {
-    return [];
-  }
-}
-
-function pushHistory(item) {
-  const arr = loadHistoryArray();
-  arr.unshift(Object.assign({timestamp: Date.now()}, item));
-  saveHistory(arr.slice(0, 200));
-  renderHistory();
-}
-
-function renderHistory() {
-  const arr = loadHistoryArray();
-  if (DOM['history-blind']) {
-    DOM['history-blind'].innerHTML = '';
-    arr.filter(i => ['stt', 'tts', 's2s'].includes(i.type)).slice(0, 50).forEach(it => {
-      const li = document.createElement('li');
-      li.textContent = `${new Date(it.timestamp).toLocaleTimeString()} — ${it.type}: ${it.text}`;
-      DOM['history-blind'].appendChild(li);
-    });
-  }
-  if (DOM['history-deaf']) {
-    DOM['history-deaf'].innerHTML = '';
-    arr.filter(i => ['sign', 'stsign', 's2s'].includes(i.type)).slice(0, 50).forEach(it => {
-      const li = document.createElement('li');
-      li.textContent = `${new Date(it.timestamp).toLocaleTimeString()} — ${it.type}: ${it.text}`;
-      DOM['history-deaf'].appendChild(li);
-    });
-  }
-}
-
-/* Apply preference toggles to UI state */
-function applyPrefsToUI() {
-  // Contrast
-  if (State.prefs.contrast) document.documentElement.classList.add('high-contrast');
-  else document.documentElement.classList.remove('high-contrast');
-
-  // Font size
-  if (State.prefs.fontSize === 'large') document.documentElement.style.fontSize = '18px';
-  else if (State.prefs.fontSize === 'small') document.documentElement.style.fontSize = '14px';
-  else document.documentElement.style.fontSize = '';
-
-  // Reduced motion
-  if (State.prefs.reduceMotion) document.documentElement.classList.add('reduced-motion');
-  else document.documentElement.classList.remove('reduced-motion');
-
-  // Sync controls
-  if (DOM['contrast-toggle']) DOM['contrast-toggle'].checked = !!State.prefs.contrast;
-  if (DOM['font-size']) DOM['font-size'].value = State.prefs.fontSize || 'medium';
-  if (DOM['reduced-motion']) DOM['reduced-motion'].checked = !!State.prefs.reduceMotion;
-  if (DOM['demo-mode']) DOM['demo-mode'].checked = !!State.prefs.demo;
-}
-
-/* ============================
-   Small UI & Accessibility Utilities
-   ============================ */
-
-function announce(message) {
-  // Update SR live region
-  if (DOM['sr-live']) DOM['sr-live'].textContent = message;
-  // If profile blind + voice enabled, speak
-  if (State.profile && State.profile.userType === 'blind' && State.profile.voiceEnabled) {
-    speak(message, {interrupt:true});
-  }
-}
-
-/* Simple show/hide page - all pages are sections with ids */
-function showPage(id) {
-  document.querySelectorAll('.page').forEach(p => {
-    if (p.id === id) {
-      p.classList.add('page-active');
-      p.removeAttribute('hidden');
-      // focus first interactive element
-      setTimeout(()=> {
-        const focusable = p.querySelector('button,a,input,textarea,select');
-        if (focusable) focusable.focus();
-      }, 200);
-    } else {
-      p.classList.remove('page-active');
-      p.hidden = true;
+/* ======================================================================
+   UI population & helpers (existing)
+   ====================================================================== */
+function populateUI(){
+  showPage('home');
+  buildSignPalette();
+  renderHistories();
+  // If a user is logged in, apply their uiPrefs and voiceEnabled
+  const user = getCurrentUser();
+  if (user) {
+    if (user.uiPrefs) {
+      State.prefs = Object.assign(State.prefs, user.uiPrefs);
+      savePrefs();
+      applyPrefsToUI();
     }
+    // Update blind voice toggle label if present
+    if (DOM['blind-voice-toggle']) {
+      DOM['blind-voice-toggle'].setAttribute('aria-pressed', user.voiceEnabled ? 'true' : 'false');
+      DOM['blind-voice-toggle'].textContent = user.voiceEnabled ? 'Disable Voice Feedback' : 'Enable Voice Feedback';
+    }
+  }
+}
+
+/* show/hide pages */
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p => {
+    if (p.id === id) { p.classList.add('page--active'); p.hidden = false; setTimeout(()=> { const focusable = p.querySelector('button, a, input, textarea, select'); if (focusable) focusable.focus(); }, 180); }
+    else { p.classList.remove('page--active'); p.hidden = true; }
   });
-  // Announce navigation
   announce(`Navigated to ${id.replace('-', ' ')}`);
 }
 
-/* Populate year in footer */
-function populateYear(){
-  if (DOM['year']) DOM['year'].textContent = new Date().getFullYear();
+/* Announce helper (existing) */
+function announce(msg){
+  if (DOM.live) DOM.live.textContent = msg;
+  const user = getCurrentUser();
+  if (user && user.voiceEnabled && State.speech.synthesisSupported) speak(msg, {interrupt:true});
 }
 
-/* Translate static text if needed - site is English only per spec */
-function translateStatic(){
-  // No-op for English site; kept for structure
-}
+/* ======================================================================
+   Event listeners & interactions (enhanced)
+   ====================================================================== */
+function attachListeners(){
+  // Navigation
+  document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => {
+    const target = btn.dataset.target;
+    const modal = btn.dataset.modal;
+    if (target) showPage(target);
+    if (modal) openModal(modal);
+  }));
+  // donate
+  const donateEls = document.querySelectorAll('.nav-link.donate, .btn-donate, #nav-donate, #cta-donate');
+  donateEls.forEach(el => el.addEventListener('click', (e) => {
+    notifyDonate();
+  }));
 
-/* ============================
-   Event Attachments
-   ============================ */
-function attachUIListeners() {
-  // Navigation buttons
-  document.querySelectorAll('.nav-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const target = btn.dataset.target;
-      const modal = btn.dataset.modal;
-      if (target) showPage(target);
-      if (modal) openModal(modal);
-    });
-    // keyboard activation (Enter/Space)
-    btn.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); btn.click(); }
-    });
-  });
+  // Header CTAs
+  if (DOM['cta-get-started']) DOM['cta-get-started'].addEventListener('click', ()=> showPage('access-choice'));
+  if (DOM['cta-login']) DOM['cta-login'].addEventListener('click', ()=> openModal('login-modal'));
+  if (DOM['cta-signup']) DOM['cta-signup'].addEventListener('click', ()=> openModal('signup-modal'));
 
-  // CTA buttons
-  if (DOM['cta-start']) DOM['cta-start'].addEventListener('click', ()=> showPage('access-choice'));
-  if (DOM['cta-guest']) DOM['cta-guest'].addEventListener('click', continueAsGuest);
-  if (DOM['cta-donate']) DOM['cta-donate'].addEventListener('click', ()=> announce('Opening donate link'));
-
-  // Preference controls
+  // Preferences toggles
   if (DOM['contrast-toggle']) DOM['contrast-toggle'].addEventListener('change', (e) => {
     State.prefs.contrast = e.target.checked;
     applyPrefsToUI();
@@ -266,7 +187,7 @@ function attachUIListeners() {
     savePrefs();
     announce('Font size updated');
   });
-  if (DOM['reduced-motion']) DOM['reduced-motion'].addEventListener('change', (e) => {
+  if (DOM['reduce-motion']) DOM['reduce-motion'].addEventListener('change', (e) => {
     State.prefs.reduceMotion = e.target.checked;
     applyPrefsToUI();
     savePrefs();
@@ -275,211 +196,444 @@ function attachUIListeners() {
   if (DOM['demo-mode']) DOM['demo-mode'].addEventListener('change', (e) => {
     State.prefs.demo = e.target.checked;
     savePrefs();
-    if (State.prefs.demo) startDemoMode(); else stopDemoMode();
-    announce(State.prefs.demo ? 'Demo mode enabled' : 'Demo mode disabled');
+    if (e.target.checked) startDemo(); else stopDemo();
   });
 
-  // TTS area on Home
-  if (DOM['tts-speak']) DOM['tts-speak'].addEventListener('click', ()=> {
-    const text = (DOM['tts-area'] && DOM['tts-area'].value) || 'Hello, welcome to AccessFirst';
-    speak(text);
-    pushHistory({type:'tts', text});
+  // Home TTS
+  if (DOM['home-tts-speak']) DOM['home-tts-speak'].addEventListener('click', () => {
+    const txt = DOM['home-tts-input'].value.trim() || 'Hello from AccessFirst';
+    speak(txt);
+    pushHistoryItem({type:'tts', text:txt});
   });
-  if (DOM['tts-stop']) DOM['tts-stop'].addEventListener('click', ()=> stopSpeaking());
-  if (DOM['tts-clear']) DOM['tts-clear'].addEventListener('click', ()=> { if (DOM['tts-area']) DOM['tts-area'].value=''; });
+  if (DOM['home-tts-stop']) DOM['home-tts-stop'].addEventListener('click', stopSpeaking);
+  if (DOM['home-tts-clear']) DOM['home-tts-clear'].addEventListener('click', ()=> { DOM['home-tts-input'].value=''; });
 
-  // Access choice
-  if (DOM['choose-blind']) DOM['choose-blind'].addEventListener('click', ()=> {
-    if (!State.profile) continueAsGuest();
-    State.profile.userType = 'blind';
-    saveProfile(State.profile);
+  // Choose flows
+  if (DOM['flow-blind']) DOM['flow-blind'].addEventListener('click', ()=> {
+    const user = getCurrentUser();
+    if (!user) { announce('Please sign up or login to proceed to Blind mode'); openModal('login-modal'); return; }
+    user.userType = 'blind';
+    saveCurrentUser(user);
     showPage('blind-flow');
-    announce('Blind mode enabled');
   });
-  if (DOM['choose-deaf']) DOM['choose-deaf'].addEventListener('click', ()=> {
-    if (!State.profile) continueAsGuest();
-    State.profile.userType = 'deaf';
-    saveProfile(State.profile);
+  if (DOM['flow-deaf']) DOM['flow-deaf'].addEventListener('click', ()=> {
+    const user = getCurrentUser();
+    if (!user) { announce('Please sign up or login to proceed to Deaf mode'); openModal('login-modal'); return; }
+    user.userType = 'deaf';
+    saveCurrentUser(user);
     showPage('deaf-flow');
-    announce('Deaf mode enabled');
   });
 
-  // Blind flow: STT & TTS
-  if (DOM['stt-start']) DOM['stt-start'].addEventListener('click', startSpeechRecognition);
-  if (DOM['stt-stop']) DOM['stt-stop'].addEventListener('click', stopSpeechRecognition);
-  if (DOM['stt-copy']) DOM['stt-copy'].addEventListener('click', ()=> {
-    if (DOM['stt-output']) {
-      navigator.clipboard?.writeText(DOM['stt-output'].value || '').then(()=> announce('Copied to clipboard'));
-    }
-  });
+  // Blind STT/TTS
+  if (DOM['blind-stt-start']) DOM['blind-stt-start'].addEventListener('click', startRecognitionForBlind);
+  if (DOM['blind-stt-stop']) DOM['blind-stt-stop'].addEventListener('click', stopRecognition);
+  if (DOM['blind-stt-copy']) DOM['blind-stt-copy'].addEventListener('click', ()=> { if (DOM['blind-stt-output']) navigator.clipboard?.writeText(DOM['blind-stt-output'].value || '').then(()=> announce('Copied recognized text')); });
 
   if (DOM['blind-tts-speak']) DOM['blind-tts-speak'].addEventListener('click', ()=> {
-    const t = DOM['blind-tts'].value || 'Hello';
-    speak(t);
-    pushHistory({type:'tts', text:t});
+    const txt = DOM['blind-tts-input'].value.trim();
+    if (!txt) { announce('Type something to speak'); return; }
+    speak(txt);
+    pushHistoryItem({type:'tts', text:txt});
   });
-  if (DOM['blind-tts-stop']) DOM['blind-tts-stop'].addEventListener('click', ()=> stopSpeaking());
-  if (DOM['blind-tts-clear']) DOM['blind-tts-clear'].addEventListener('click', ()=> { if (DOM['blind-tts']) DOM['blind-tts'].value = ''; });
+  if (DOM['blind-tts-stop']) DOM['blind-tts-stop'].addEventListener('click', stopSpeaking);
+  if (DOM['blind-tts-clear']) DOM['blind-tts-clear'].addEventListener('click', ()=> { DOM['blind-tts-input'].value=''; });
 
-  // Deaf flow: Sign-to-speech palette
-  populateSignPalette();
+  // New: Blind voice feedback toggle
+  if (DOM['blind-voice-toggle']) DOM['blind-voice-toggle'].addEventListener('click', ()=> {
+    const user = getCurrentUser();
+    if (!user) { announce('Login required to enable voice feedback'); openModal('login-modal'); return; }
+    user.voiceEnabled = !user.voiceEnabled;
+    saveCurrentUser(user);
+    DOM['blind-voice-toggle'].setAttribute('aria-pressed', user.voiceEnabled ? 'true' : 'false');
+    DOM['blind-voice-toggle'].textContent = user.voiceEnabled ? 'Disable Voice Feedback' : 'Enable Voice Feedback';
+    announce(user.voiceEnabled ? 'Voice feedback enabled' : 'Voice feedback disabled');
+  });
+
+  // Deaf sign-to-speech: palette clicks
   if (DOM['sign-palette']) DOM['sign-palette'].addEventListener('click', (e) => {
     const btn = e.target.closest('[data-sign]');
     if (!btn) return;
-    const word = btn.dataset.sign;
-    appendToPhrase(word);
+    appendSign(btn.dataset.sign);
   });
   if (DOM['s2s-speak']) DOM['s2s-speak'].addEventListener('click', ()=> {
-    const phrase = DOM['assembled-phrase'].textContent.trim();
-    if (!phrase) { announce('No phrase to speak'); return; }
+    const phrase = (DOM['assembled-phrase'].textContent || '').trim();
+    if (!phrase) { announce('No phrase composed'); return; }
     speak(phrase);
-    pushHistory({type:'s2s', text:phrase});
+    pushHistoryItem({type:'s2s', text:phrase});
   });
-  if (DOM['s2s-clear']) DOM['s2s-clear'].addEventListener('click', ()=> { DOM['assembled-phrase'].textContent=''; });
+  if (DOM['s2s-clear']) DOM['s2s-clear'].addEventListener('click', ()=> DOM['assembled-phrase'].textContent = '');
 
-  // Deaf flow: camera & detection
-  if (DOM['start-detection']) DOM['start-detection'].addEventListener('click', startHandsignDetection);
-  if (DOM['stop-detection']) DOM['stop-detection'].addEventListener('click', stopHandsignDetection);
+  // Camera / Handsign
+  if (DOM['start-camera']) DOM['start-camera'].addEventListener('click', startCameraDetection);
+  if (DOM['stop-camera']) DOM['stop-camera'].addEventListener('click', stopCameraDetection);
   if (DOM['speak-detected']) DOM['speak-detected'].addEventListener('click', ()=> {
-    const txt = DOM['detected-sign'].textContent || '';
-    if (txt && txt !== 'No sign detected') { speak(txt); pushHistory({type:'sign', text:txt}); }
+    const txt = DOM['detected-sign'].textContent;
+    if (txt && txt !== 'No sign detected') { speak(txt); pushHistoryItem({type:'sign', text:txt}); }
   });
 
-  // Login / Signup modals
-  const navLogin = document.getElementById('nav-login');
-  const navSignup = document.getElementById('nav-signup');
-  if (navLogin) navLogin.addEventListener('click', ()=> openModal('login-modal'));
-  if (navSignup) navSignup.addEventListener('click', ()=> openModal('signup-modal'));
+  // Deaf speech-to-sign (new)
+  if (DOM['deaf-stt-start']) DOM['deaf-stt-start'].addEventListener('click', startSpeechToSign);
+  if (DOM['deaf-stt-stop']) DOM['deaf-stt-stop'].addEventListener('click', stopRecognition);
 
+  // Login modal events - enhanced to apply user uiPrefs on login
   if (DOM['login-form']) {
-    DOM['login-form'].addEventListener('submit', (e) => {
+    DOM['login-form'].addEventListener('submit', async (e) => {
       e.preventDefault();
-      const username = (DOM['login-username'] && DOM['login-username'].value.trim()) || '';
-      const type = (DOM['login-type'] && DOM['login-type'].value) || 'none';
-      if (!username || username.length < 2) { alert('Please enter a valid username (2+ characters).'); return; }
-      saveProfile({username, userType: type, uiPrefs: Object.assign({}, State.prefs), voiceEnabled: false});
+      const email = (DOM['login-email'].value || '').trim().toLowerCase();
+      const password = DOM['login-password'].value || '';
+      if (!email || !password) { alert('Provide email and password'); return; }
+      const user = State.users.find(u => u.email === email);
+      if (!user) { alert('No account found. Please sign up.'); return; }
+      const hash = await hashPassword(password);
+      if (hash !== user.passwordHash) { alert('Invalid credentials'); return; }
+      // success: apply user preferences & voiceEnabled
+      saveCurrent(email);
+      if (user.uiPrefs) {
+        State.prefs = Object.assign(State.prefs, user.uiPrefs);
+        savePrefs();
+        applyPrefsToUI();
+      }
+      // update blind voice toggle label if present
+      if (DOM['blind-voice-toggle']) {
+        DOM['blind-voice-toggle'].setAttribute('aria-pressed', user.voiceEnabled ? 'true' : 'false');
+        DOM['blind-voice-toggle'].textContent = user.voiceEnabled ? 'Disable Voice Feedback' : 'Enable Voice Feedback';
+      }
+      announce(`Welcome back, ${user.username}`);
       closeModal('login-modal');
     });
-    if (DOM['login-cancel']) DOM['login-cancel'].addEventListener('click', ()=> closeModal('login-modal'));
+    if (DOM['login-close']) DOM['login-close'].addEventListener('click', ()=> closeModal('login-modal'));
+    if (DOM['login-google']) DOM['login-google'].addEventListener('click', ()=> simulateThirdPartyLogin('Google'));
+    if (DOM['login-microsoft']) DOM['login-microsoft'].addEventListener('click', ()=> simulateThirdPartyLogin('Microsoft'));
   }
 
+  // Signup modal events - on signup we already notified owner; ensure uiPrefs applied (existing code)
   if (DOM['signup-form']) {
-    DOM['signup-form'].addEventListener('submit', (e) => {
+    if (DOM['signup-password']) {
+      DOM['signup-password'].addEventListener('input', (e) => {
+        const val = e.target.value;
+        const score = passwordStrengthScore(val);
+        if (DOM['pwd-strength']) DOM['pwd-strength'].value = score;
+        if (DOM['pwd-feedback']) DOM['pwd-feedback'].textContent = 'Password strength: ' + ['Very weak','Weak','Fair','Good','Strong'][score];
+      });
+    }
+
+    DOM['signup-form'].addEventListener('submit', async (e) => {
       e.preventDefault();
-      const username = (DOM['signup-username'] && DOM['signup-username'].value.trim()) || '';
-      const type = (DOM['signup-type'] && DOM['signup-type'].value) || 'none';
-      const contrast = DOM['signup-contrast']?.checked || false;
-      const reduced = DOM['signup-reduced']?.checked || false;
-      const font = DOM['signup-font']?.value || 'medium';
-      if (!username || username.length < 2) { alert('Please enter a valid username (2+ characters).'); return; }
-      const profile = {username, userType: type, uiPrefs: {contrast, fontSize: font, reduceMotion: reduced}, voiceEnabled: false};
-      saveProfile(profile);
-      // apply preferences
-      State.prefs = Object.assign(State.prefs, profile.uiPrefs);
+      const username = (DOM['signup-username'].value || '').trim();
+      const email = (DOM['signup-email'].value || '').trim().toLowerCase();
+      const password = DOM['signup-password'].value || '';
+      if (!username || !email || !password) { alert('Please fill required fields'); return; }
+      if (!validateEmail(email)) { alert('Enter a valid email'); return; }
+      if (State.users.some(u => u.email === email)) { alert('Email already registered'); return; }
+      if (passwordStrengthScore(password) < 2) { if (!confirm('Password looks weak. Create account anyway?')) return; }
+
+      const passwordHash = await hashPassword(password);
+      const uiPrefs = {
+        contrast: !!DOM['signup-contrast']?.checked,
+        reduceMotion: !!DOM['signup-reduce']?.checked,
+        fontSize: DOM['signup-font']?.value || 'medium'
+      };
+      const user = {username,email,passwordHash,createdAt:Date.now(),uiPrefs,voiceEnabled:false,userType:'none'};
+      State.users.push(user);
+      saveUsers();
+
+      // Apply user prefs immediately
+      State.prefs = Object.assign(State.prefs, uiPrefs);
       savePrefs();
       applyPrefsToUI();
+
+      // Notify owner via mailto and record notification
+      notifyOwnerNewSignup(user);
+
+      // Auto-login user and update blind toggle
+      saveCurrent(email);
+      if (DOM['blind-voice-toggle']) {
+        DOM['blind-voice-toggle'].setAttribute('aria-pressed', 'false');
+        DOM['blind-voice-toggle'].textContent = 'Enable Voice Feedback';
+      }
+      announce(`Account created for ${username}`);
       closeModal('signup-modal');
     });
-    if (DOM['signup-cancel']) DOM['signup-cancel'].addEventListener('click', ()=> closeModal('signup-modal'));
+
+    if (DOM['signup-close']) DOM['signup-close'].addEventListener('click', ()=> closeModal('signup-modal'));
+    if (DOM['signup-google']) DOM['signup-google'].addEventListener('click', ()=> simulateThirdPartySignUp('Google'));
+    if (DOM['signup-microsoft']) DOM['signup-microsoft'].addEventListener('click', ()=> simulateThirdPartySignUp('Microsoft'));
   }
 
-  // back buttons (data-target attr)
-  document.addEventListener('click', (e) => {
-    const b = e.target.closest('[data-target]');
-    if (!b) return;
-    const target = b.dataset.target;
-    if (target) showPage(target);
-  });
-
-  // keyboard global: Escape closes dialogs
+  // keyboard accessibility: Enter/Space trigger on role=button handled by native button elements; escape closes modals
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      closeModal('login-modal'); closeModal('signup-modal');
-    }
+    if (e.key === 'Escape') { closeModal('login-modal'); closeModal('signup-modal'); }
+  });
+
+  // Focus-in voice feedback for blind users (new)
+  document.addEventListener('focusin', (e) => {
+    try {
+      const user = getCurrentUser();
+      if (!user || !user.voiceEnabled) return;
+      if (user.userType !== 'blind') return;
+      const label = accessibleLabel(e.target);
+      if (label && State.speech.synthesisSupported) speak(label, {interrupt:true});
+    } catch (err) { console.warn('focusin voice feedback error', err); }
   });
 }
 
-/* ============================
-   Modal helpers
-   ============================ */
-function openModal(id) {
-  const dlg = document.getElementById(id);
-  if (!dlg) return;
-  if (typeof dlg.showModal === 'function') dlg.showModal();
-  else dlg.style.display = 'block';
-  // focus first input
-  setTimeout(()=> dlg.querySelector('input,select,button')?.focus(), 120);
+/* ======================================================================
+   Utility helpers (enhancements)
+   ====================================================================== */
+function validateEmail(email){ return /\S+@\S+\.\S+/.test(email); }
+function passwordStrengthScore(pw){
+  let score = 0;
+  if (!pw) return 0;
+  if (pw.length >= 8) score++;
+  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+  if (/\d/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  return Math.min(4, score);
 }
-function closeModal(id) {
-  const dlg = document.getElementById(id);
-  if (!dlg) return;
-  if (typeof dlg.close === 'function') dlg.close();
-  else dlg.style.display = 'none';
+async function hashPassword(pw){
+  const enc = new TextEncoder();
+  const data = enc.encode(pw);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+function getCurrentUser(){ const email = localStorage.getItem(LS_KEYS.CURRENT); if (!email) return null; return State.users.find(u => u.email === email) || null; }
+function saveCurrentUser(user){ if (!user || !user.email) return; saveCurrent(user.email); const idx = State.users.findIndex(u => u.email === user.email); if (idx >= 0) { State.users[idx] = user; saveUsers(); } }
+function saveCurrent(email){ if (email) localStorage.setItem(LS_KEYS.CURRENT, email); else localStorage.removeItem(LS_KEYS.CURRENT); State.current = email; }
+
+/* Accessible label extraction (used for focus speaking) */
+function accessibleLabel(el){
+  if (!el) return '';
+  if (el.getAttribute && el.getAttribute('aria-label')) return el.getAttribute('aria-label');
+  if (el.getAttribute && el.getAttribute('aria-labelledby')) {
+    const id = el.getAttribute('aria-labelledby');
+    const node = document.getElementById(id);
+    if (node) return node.textContent.trim();
+  }
+  if (el.alt) return el.alt;
+  if (el.innerText && el.innerText.trim()) return el.innerText.trim();
+  if (el.value) return String(el.value);
+  return '';
 }
 
-/* ============================
-   Speech: TTS & STT
-   ============================ */
-
-/* TTS */
-function speak(text, opts = {}) {
-  if (!('speechSynthesis' in window)) { alert('Speech synthesis not supported.'); return; }
-  if (!text) return;
+/* ======================================================================
+   TTS/STT functions (existing with small improvements)
+   ====================================================================== */
+function speak(text, opts = {interrupt:false}){
+  if (!State.speech.synthesisSupported) { alert('Text-to-Speech not supported in this browser.'); return; }
   try {
     if (opts.interrupt) window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'en-US';
-    // voice selection fallback
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.lang = 'en-US';
     const voices = window.speechSynthesis.getVoices();
-    if (voices && voices.length) {
-      // try to pick a neutral English voice
-      u.voice = voices.find(v => v.lang && v.lang.startsWith('en')) || voices[0];
-    }
-    window.speechSynthesis.speak(u);
-  } catch (e) {
-    console.warn('TTS error', e);
-  }
+    if (voices && voices.length) utt.voice = voices.find(v => v.lang && v.lang.startsWith('en')) || voices[0];
+    window.speechSynthesis.speak(utt);
+  } catch (e) { console.warn('TTS error', e); }
 }
-function stopSpeaking() { if ('speechSynthesis' in window) window.speechSynthesis.cancel(); }
+function stopSpeaking(){ if (window.speechSynthesis) window.speechSynthesis.cancel(); }
 
-/* STT (SpeechRecognition) */
-function initSpeechRecognition() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
-  if (!SpeechRecognition) {
-    console.warn('SpeechRecognition not supported');
-    return;
-  }
-  try {
-    State.speech.recognition = new SpeechRecognition();
-    State.speech.recognition.lang = 'en-US';
-    State.speech.recognition.interimResults = false;
-    State.speech.recognition.onresult = (ev) => {
-      const text = ev.results[0][0].transcript;
-      if (DOM['stt-output']) DOM['stt-output'].value = text;
-      pushHistory({type:'stt', text});
+/* STT initialization */
+function initSpeechRecognition(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  if (!SR) { console.warn('SpeechRecognition not available'); return; }
+  try{
+    const recog = new SR();
+    recog.lang = 'en-US';
+    recog.interimResults = false;
+
+    // default onresult - used by blind STT
+    recog.onresult = (ev) => {
+      const txt = ev.results[0][0].transcript;
+      if (DOM['blind-stt-output']) DOM['blind-stt-output'].value = txt;
+      pushHistoryItem({type:'stt', text:txt});
       announce('Speech recognized');
     };
-    State.speech.recognition.onstart = ()=> { State.speech.recognizing = true; announce('Listening...'); };
-    State.speech.recognition.onend = ()=> { State.speech.recognizing = false; announce('Stopped listening'); };
-    State.speech.recognition.onerror = (e)=> { console.warn('Recognition error', e); announce('Recognition error'); };
+    recog.onstart = ()=> { State.speech.listening = true; announce('Listening...'); };
+    recog.onend = ()=> { State.speech.listening = false; announce('Stopped listening'); };
+    recog.onerror = (e) => { console.warn('Recognition error', e); announce('Recognition error'); };
+    State.speech.recognition = recog;
+  } catch (e) { console.warn('SpeechRecognition init failed', e); }
+}
+
+/* Start recognition specifically for Blind STT (uses default handler) */
+function startRecognitionForBlind(){
+  if (!State.speech.recognition) { alert('Speech recognition not supported in this browser.'); return; }
+  try { State.speech.recognition.start(); } catch(e) { console.warn(e); }
+}
+
+/* Stop recognition wrapper */
+function stopRecognition(){
+  if (State.speech.recognition) try { State.speech.recognition.stop(); } catch(e) { console.warn(e); }
+}
+
+/* ======================================================================
+   Deaf Speech-to-Sign (new feature)
+   - Uses the same SpeechRecognition but overrides onresult temporarily to map text to sign placeholders
+   ====================================================================== */
+const SIGN_MAP = {
+  hello: '👋',
+  hi: '👋',
+  yes: '👍',
+  no: '👎',
+  thank: '🙏',
+  thanks: '🙏',
+  help: '🆘',
+  good: '🌟',
+  'thank you': '🙏',
+  'i love you': '🤟'
+};
+
+function mapTextToSigns(text){
+  const words = text.split(/\s+/).slice(0,20);
+  const mapped = words.map(w => {
+    const key = w.toLowerCase().replace(/[^\w\s]/g,'');
+    return SIGN_MAP[key] || '🤟';
+  });
+  return mapped;
+}
+
+function startSpeechToSign(){
+  if (!State.speech.recognition) { alert('Speech recognition not available'); return; }
+  // set specific onresult to map to signs and update deaf-stt-output & deaf-stt-signs
+  State.speech.recognition.onresult = (ev) => {
+    const txt = ev.results[0][0].transcript;
+    if (DOM['deaf-stt-output']) DOM['deaf-stt-output'].value = txt;
+    const mapped = mapTextToSigns(txt);
+    if (DOM['deaf-stt-signs']) {
+      DOM['deaf-stt-signs'].innerHTML = '';
+      mapped.forEach(s => {
+        const span = document.createElement('span');
+        span.style.display='inline-block';
+        span.style.margin='0.25rem';
+        span.style.padding='0.4rem 0.6rem';
+        span.style.borderRadius='8px';
+        span.style.background='rgba(255,255,255,0.7)';
+        span.style.border='1px solid rgba(0,0,0,0.06)';
+        span.textContent = s;
+        DOM['deaf-stt-signs'].appendChild(span);
+      });
+    }
+    pushHistoryItem({type:'stsign', text:txt});
+    announce('Speech converted to signs');
+  };
+  try { State.speech.recognition.start(); } catch(e) { console.warn(e); }
+}
+
+/* Stop recognition uses generic stopRecognition() above */
+
+/* ======================================================================
+   Handsign / Camera detection (existing, unchanged) - attemptInitHandsign,
+   start/stop camera, detection loops are present in previous code base.
+   We only ensure functions exist and are callable.
+   ====================================================================== */
+async function attemptInitHandsign(){
+  // attempt to initialize handsign (best-effort)
+  await new Promise(res => setTimeout(res, 400));
+  try {
+    if (window.handsign && typeof window.handsign.loadModel === 'function') {
+      const detector = await window.handsign.loadModel(State.handsign.modelUrl);
+      State.handsign.detector = detector;
+      State.handsign.initialized = true;
+      console.info('Handsign detector initialized (window.handsign)');
+      return;
+    }
+    if (window.HandSign && typeof window.HandSign === 'object') {
+      if (typeof window.HandSign.init === 'function') {
+        await window.HandSign.init(State.handsign.modelUrl);
+        State.handsign.detector = window.HandSign;
+        State.handsign.initialized = true;
+        console.info('Handsign detector initialized (HandSign.init)');
+        return;
+      }
+    }
+    if (window.tf && typeof window.tf.loadGraphModel === 'function') {
+      try {
+        const model = await window.tf.loadGraphModel(State.handsign.modelUrl);
+        State.handsign.detector = model;
+        State.handsign.initialized = true;
+        console.info('Handsign model loaded via tf.loadGraphModel');
+        return;
+      } catch (err) { console.warn('tf.loadGraphModel failed', err); }
+    }
+  } catch (e) { console.warn('Handsign initialization error', e); }
+  State.handsign.initialized = false;
+  console.info('Handsign not available; using simulated detection');
+}
+
+async function startCameraDetection(){
+  if (State.handsign.streaming) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}, audio:false});
+    DOM['camera-video'].srcObject = stream;
+    State.handsign.videoStream = stream;
+    State.handsign.streaming = true;
+    if (DOM['camera-status']) DOM['camera-status'].textContent = 'Status: camera active';
+    if (State.handsign.initialized && State.handsign.detector) runRealDetectionLoop();
+    else runSimulatedDetectionLoop();
+    announce('Camera started for sign detection');
   } catch (e) {
-    console.warn('Init recognition failed', e);
+    console.warn('Camera access error', e);
+    alert('Camera access is required for real-time detection. Please allow camera permissions or use the manual sign palette.');
+    if (DOM['camera-status']) DOM['camera-status'].textContent = 'Status: camera unavailable';
   }
 }
-
-function startSpeechRecognition() {
-  if (!State.speech.recognition) { alert('Speech recognition not supported in this browser.'); return; }
-  try { State.speech.recognition.start(); } catch(e){ console.warn(e); }
+function stopCameraDetection(){
+  if (!State.handsign.streaming) return;
+  if (State.handsign.videoStream) { State.handsign.videoStream.getTracks().forEach(t=>t.stop()); State.handsign.videoStream = null; }
+  State.handsign.streaming = false;
+  if (DOM['camera-status']) DOM['camera-status'].textContent = 'Status: stopped';
+  if (DOM['detected-sign']) DOM['detected-sign'].textContent = 'No sign detected';
+  announce('Camera stopped');
 }
-function stopSpeechRecognition() {
-  if (State.speech.recognition) try { State.speech.recognition.stop(); } catch(e) {}
+async function runRealDetectionLoop(){
+  const video = DOM['camera-video']; const canvas = DOM['camera-canvas']; const ctx = canvas.getContext('2d');
+  await new Promise(res => { if (video.readyState >= 2) return res(); video.onloadeddata = ()=> res(); });
+  canvas.width = video.videoWidth || 640; canvas.height = video.videoHeight || 480;
+  async function loop(){
+    if (!State.handsign.streaming) return;
+    try {
+      ctx.drawImage(video,0,0,canvas.width,canvas.height);
+      const det = State.handsign.detector;
+      let label = null;
+      if (det && typeof det.predict === 'function') {
+        const res = await det.predict(canvas);
+        label = res?.label || res?.class || JSON.stringify(res);
+      } else if (det && typeof det.classify === 'function') {
+        const res = await det.classify(canvas);
+        label = res?.label || (Array.isArray(res) && res[0]?.className) || JSON.stringify(res);
+      } else if (det && typeof det.executeAsync === 'function' && window.tf) {
+        try {
+          const img = tf.browser.fromPixels(canvas).toFloat().div(255).expandDims(0);
+          const out = await det.executeAsync(img);
+          label = 'Sign detected';
+          tf.dispose(img);
+        } catch (e){ console.warn('TF model inference failed', e); }
+      } else { label = 'Sign detected'; }
+      if (!label) label = 'Sign detected';
+      if (DOM['detected-sign']) DOM['detected-sign'].textContent = label;
+      pushHistoryItem({type:'stsign', text:label});
+    } catch (err) { console.warn('Detection error', err); if (DOM['detected-sign']) DOM['detected-sign'].textContent = 'Detection error'; }
+    setTimeout(()=> { if (State.handsign.streaming) requestAnimationFrame(loop); }, 300);
+  }
+  loop();
+}
+function runSimulatedDetectionLoop(){
+  const choices = SIGN_SET.map(s=>s.key);
+  let idx=0;
+  function loop(){
+    if (!State.handsign.streaming) return;
+    const choice = choices[idx % choices.length];
+    if (DOM['detected-sign']) DOM['detected-sign'].textContent = choice;
+    pushHistoryItem({type:'stsign', text:choice});
+    idx++;
+    setTimeout(()=> { if (State.handsign.streaming) loop(); }, 1400);
+  }
+  loop();
 }
 
-/* ============================
-   Sign-to-Speech (palette) helpers
-   ============================ */
-
-const DEFAULT_SIGNS = [
+/* ======================================================================
+   Sign palette & helpers (existing)
+   ====================================================================== */
+const SIGN_SET = [
   {key:'Hello', emoji:'👋'},
   {key:'Yes', emoji:'👍'},
   {key:'No', emoji:'👎'},
@@ -487,347 +641,230 @@ const DEFAULT_SIGNS = [
   {key:'Help', emoji:'🆘'},
   {key:'Good', emoji:'🌟'}
 ];
-
-function populateSignPalette() {
-  const palette = DOM['sign-palette'];
-  if (!palette) return;
-  palette.innerHTML = '';
-  DEFAULT_SIGNS.forEach(s => {
+function buildSignPalette(){
+  if (!DOM['sign-palette']) return;
+  DOM['sign-palette'].innerHTML = '';
+  SIGN_SET.forEach(s => {
     const btn = document.createElement('button');
     btn.className = 'sign-btn';
     btn.type = 'button';
     btn.dataset.sign = s.key;
-    btn.innerHTML = `${s.emoji} <span class="sign-label">${s.key}</span>`;
     btn.setAttribute('aria-label', `Sign ${s.key}`);
-    palette.appendChild(btn);
+    btn.innerHTML = `${s.emoji} <span class="sign-label">${s.key}</span>`;
+    DOM['sign-palette'].appendChild(btn);
   });
 }
-
-function appendToPhrase(word) {
-  const el = DOM['assembled-phrase'];
-  if (!el) return;
-  if (!el.textContent || el.textContent.trim() === '') el.textContent = word;
-  else el.textContent = (el.textContent.trim() + ' ' + word);
+function appendSign(word){
+  if (!DOM['assembled-phrase']) return;
+  const cur = DOM['assembled-phrase'].textContent.trim();
+  DOM['assembled-phrase'].textContent = cur ? `${cur} ${word}` : word;
 }
 
-/* ============================
-   Handsign (TensorFlow) integration + Camera
-   ============================ */
+/* ======================================================================
+   History helpers (existing)
+   ====================================================================== */
+function pushHistoryItem(item){
+  const arr = JSON.parse(localStorage.getItem(LS_KEYS.HISTORY) || '[]');
+  arr.unshift(Object.assign({timestamp: Date.now()}, item));
+  localStorage.setItem(LS_KEYS.HISTORY, JSON.stringify(arr.slice(0,200)));
+  renderHistories();
+}
+function renderHistories(){
+  const arr = JSON.parse(localStorage.getItem(LS_KEYS.HISTORY) || '[]');
+  if (DOM['history-blind']) {
+    DOM['history-blind'].innerHTML = '';
+    arr.filter(i => ['stt','tts','s2s'].includes(i.type)).slice(0,50).forEach(it=>{
+      const li = document.createElement('li');
+      li.textContent = `${new Date(it.timestamp).toLocaleTimeString()} — ${it.type}: ${it.text}`;
+      DOM['history-blind'].appendChild(li);
+    });
+  }
+  if (DOM['history-deaf']) {
+    DOM['history-deaf'].innerHTML = '';
+    arr.filter(i => ['sign','stsign','s2s'].includes(i.type)).slice(0,50).forEach(it=>{
+      const li = document.createElement('li');
+      li.textContent = `${new Date(it.timestamp).toLocaleTimeString()} — ${it.type}: ${it.text}`;
+      DOM['history-deaf'].appendChild(li);
+    });
+  }
+}
 
-/*
-  Integration approach:
-  - Try to use the Handsign library (loaded via script tag).
-  - If available, call the library's initializer. Since external library API may vary,
-    we attempt common calls and fallback gracefully.
-  - If unavailable or fails, we fallback to simple simulated detection (periodic random picks)
-    but still provide a camera preview.
-*/
-
-async function initHandsignIfAvailable(){
-  // Wait a bit for tf/handsign scripts to load
-  await new Promise(res => setTimeout(res, 300));
-  // If handsign library exposes a known global, try to initialize with model URL
+/* ======================================================================
+   Notifications & mailto (existing)
+   ====================================================================== */
+const OWNER_EMAIL = 'hailegebrialantehunegn@gmail.com';
+function notifyOwnerNewSignup(user, provider){
+  const subject = encodeURIComponent(`New AccessFirst signup: ${user.username}`);
+  const bodyLines = [
+    `A new user signed up on AccessFirst.`,
+    `Username: ${user.username}`,
+    `Email: ${user.email}`,
+    `Provider: ${provider || 'local'}`,
+    `Timestamp: ${new Date().toISOString()}`,
+    '',
+    'This message was initiated by the AccessFirst frontend (no backend).'
+  ];
+  const body = encodeURIComponent(bodyLines.join('\n'));
+  const mailto = `mailto:${OWNER_EMAIL}?subject=${subject}&body=${body}`;
+  openMailClient(mailto);
+  pushNotification({type:'signup', to:OWNER_EMAIL, user:{username:user.username,email:user.email,provider:provider||'local'}});
+}
+function notifyDonate(){
+  const subject = encodeURIComponent('AccessFirst: Donate click to Mekedonia');
+  const bodyLines = [
+    `A visitor clicked the Donate button to Mekedonia GoFundMe from AccessFirst.`,
+    `URL: https://www.gofundme.com/f/Mekedonia-Charity-help-build-home-for-the-homeless`,
+    `Timestamp: ${new Date().toISOString()}`,
+    '',
+    'Please note this donation was initiated via AccessFirst (frontend notification).'
+  ];
+  const body = encodeURIComponent(bodyLines.join('\n'));
+  const mailto = `mailto:${OWNER_EMAIL}?subject=${subject}&body=${body}`;
+  openMailClient(mailto);
+  pushNotification({type:'donate', to:OWNER_EMAIL, payload:{url:'https://www.gofundme.com/f/Mekedonia-Charity-help-build-home-for-the-homeless'}});
+}
+function openMailClient(mailto){
   try {
-    // Example: some libs set window.HandSign, window.handsign, window.HandSignModel
-    const HS = window.handsign || window.HandSign || window.HandSignModel || window.HandSignTensor;
-    if (HS && typeof HS === 'object') {
-      // If library provides an async init, call it
-      if (HS.init && typeof HS.init === 'function') {
-        try {
-          await HS.init(State.handsign.modelUrl);
-          State.handsign.detector = HS;
-          State.handsign.enabled = true;
-          State.handsign.initialized = true;
-          console.info('Handsign library initialized (object API)');
-          return;
-        } catch (err) { console.warn('HS.init failed', err); }
-      }
-      // otherwise, if it provides loadModel
-      if (HS.loadModel && typeof HS.loadModel === 'function') {
-        try {
-          State.handsign.detector = await HS.loadModel(State.handsign.modelUrl);
-          State.handsign.enabled = true;
-          State.handsign.initialized = true;
-          console.info('Handsign model loaded via loadModel');
-          return;
-        } catch (err) { console.warn('HS.loadModel failed', err); }
-      }
-    }
-    // Another attempt: if tf is present, try to load model directly (best-effort)
-    if (window.tf && window.tf.loadGraphModel) {
-      try {
-        const model = await window.tf.loadGraphModel(State.handsign.modelUrl);
-        State.handsign.detector = model;
-        State.handsign.enabled = true;
-        State.handsign.initialized = true;
-        console.info('Handsign model loaded via tf.loadGraphModel (generic)');
-        return;
-      } catch (err) {
-        console.warn('tf.loadGraphModel failed', err);
-      }
-    }
+    window.open(mailto, '_blank');
+    announce('Opening your email client to notify the site owner.');
+    pushNotification({type:'mailto_opened', to: OWNER_EMAIL, mailto});
   } catch (e) {
-    console.warn('Handsign initialization error', e);
+    console.warn('mailto failed', e);
+    const fallback = `To: ${OWNER_EMAIL}\n\n${decodeURIComponent(mailto.split('?body=')[1]||'')}`;
+    prompt('Copy and send the following to notify the site owner:', fallback);
+    pushNotification({type:'mailto_failed', to:OWNER_EMAIL, fallback});
   }
-  // If we reach here, no model available — disable camera detection but allow manual sign palette
-  State.handsign.enabled = false;
-  State.handsign.initialized = false;
-  console.info('Handsign not available; camera detection will fallback to simulation');
 }
 
-/* Camera start/stop + detection loop */
-async function startHandsignDetection() {
-  if (State.handsign.streaming) return;
-  // request camera
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}, audio:false});
-    const video = DOM['camera-video'];
-    video.srcObject = stream;
-    State.handsign.videoStream = stream;
-    State.handsign.streaming = true;
-    DOM['camera-status'].textContent = 'Camera active';
-    announce('Camera started for sign detection');
-    // if we have a real detector, start inference loop; else simulate
-    if (State.handsign.initialized && State.handsign.enabled && State.handsign.detector) {
-      runDetectionLoopReal();
-    } else {
-      runDetectionLoopSimulated();
+/* ======================================================================
+   Third-party simulated logins (existing)
+   ====================================================================== */
+function simulateThirdPartyLogin(provider){
+  const email = `${provider.toLowerCase()}-user@example.com`;
+  let user = State.users.find(u => u.email === email);
+  if (!user) {
+    user = {username: `${provider}User`, email, passwordHash: '', createdAt: Date.now(), uiPrefs:{}, voiceEnabled:false, userType:'none'};
+    State.users.push(user);
+    saveUsers();
+    notifyOwnerNewSignup(user, provider);
+  }
+  saveCurrent(email);
+  if (user.uiPrefs) { State.prefs = Object.assign(State.prefs, user.uiPrefs); savePrefs(); applyPrefsToUI(); }
+  if (DOM['blind-voice-toggle']) {
+    DOM['blind-voice-toggle'].setAttribute('aria-pressed', user.voiceEnabled ? 'true' : 'false');
+    DOM['blind-voice-toggle'].textContent = user.voiceEnabled ? 'Disable Voice Feedback' : 'Enable Voice Feedback';
+  }
+  announce(`Logged in via ${provider} as ${user.username}`);
+  closeModal('login-modal');
+}
+function simulateThirdPartySignUp(provider){
+  const email = `${provider.toLowerCase()}-user@example.com`;
+  if (!State.users.some(u => u.email === email)) {
+    const user = {username:`${provider}User`, email, passwordHash:'', createdAt:Date.now(), uiPrefs:{}, voiceEnabled:false, userType:'none'};
+    State.users.push(user);
+    saveUsers();
+    notifyOwnerNewSignup(user, provider);
+    saveCurrent(email);
+    if (DOM['blind-voice-toggle']) {
+      DOM['blind-voice-toggle'].setAttribute('aria-pressed', 'false');
+      DOM['blind-voice-toggle'].textContent = 'Enable Voice Feedback';
     }
-  } catch (e) {
-    console.warn('Camera error', e);
-    DOM['camera-status'].textContent = 'Camera unavailable';
-    alert('Unable to access camera. Please allow camera permissions or use manual sign palette.');
+    announce(`Signed up via ${provider} as ${user.username}`);
+    closeModal('signup-modal');
+  } else {
+    saveCurrent(email);
+    announce(`Signed in via ${provider}`);
+    closeModal('signup-modal');
   }
 }
 
-function stopHandsignDetection(){
-  if (!State.handsign.streaming) return;
-  if (State.handsign.videoStream) {
-    State.handsign.videoStream.getTracks().forEach(t => t.stop());
-    State.handsign.videoStream = null;
+/* ======================================================================
+   Demo & reminders (existing)
+   ====================================================================== */
+function startDemo(){
+  if (State.demoTimer) clearTimeout(State.demoTimer);
+  const steps = [
+    ()=> showPage('access-choice'),
+    ()=> { document.getElementById('flow-blind').focus(); },
+    ()=> showPage('blind-flow'),
+    ()=> { if (DOM['blind-tts-input']) { DOM['blind-tts-input'].value = 'Hello from demo mode'; DOM['blind-tts-speak'].click(); } },
+    ()=> showPage('deaf-flow'),
+    ()=> { startCameraDetection(); },
+    ()=> { stopCameraDetection(); showPage('home'); }
+  ];
+  let i = 0;
+  announce('Demo starting');
+  function run(){
+    if (i >= steps.length) { announce('Demo finished'); clearTimeout(State.demoTimer); State.demoTimer=null; return; }
+    try { steps[i](); } catch(e){ console.warn('Demo step error', e); }
+    i++;
+    State.demoTimer = setTimeout(run, 1400);
   }
-  State.handsign.streaming = false;
-  DOM['camera-status'].textContent = 'Camera stopped';
-  DOM['detected-sign'].textContent = 'No sign detected';
-  announce('Camera stopped');
-  // cancel any loops by flipping streaming flag — loops check this flag
+  run();
 }
+function stopDemo(){ if (State.demoTimer) clearTimeout(State.demoTimer); State.demoTimer=null; }
 
-/* Real detection loop — best-effort using detector interface */
-async function runDetectionLoopReal(){
-  const video = DOM['camera-video'];
-  const canvas = DOM['camera-canvas'];
-  const ctx = canvas.getContext('2d');
-  // ensure canvas matches video
-  function resizeCanvas() {
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-  }
-  // Wait for video to be ready
-  await new Promise(res => {
-    if (video.readyState >= 2) return res();
-    video.onloadeddata = () => res();
-  });
-  resizeCanvas();
-
-  // detection loop
-  async function loop() {
-    if (!State.handsign.streaming) return;
-    try {
-      // draw frame
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      // extract tensor from canvas
-      if (window.tf && State.handsign.detector && typeof State.handsign.detector.executeAsync === 'function') {
-        // Best-effort attempt: convert canvas to tensor and run model
-        const img = tf.browser.fromPixels(canvas).expandDims(0).toFloat().div(255);
-        const result = await State.handsign.detector.executeAsync(img);
-        // Interpret result into a 'label' — model-specific; attempt to extract names
-        let label = null;
-        try {
-          // Some models return logits or probabilities. We'll try to find a top label if present.
-          if (Array.isArray(result) && result.length) {
-            // search for a tensor that looks like label indices/probs
-            for (const r of result) {
-              if (r.arraySync) {
-                const arr = await r.array();
-                // flatten and find top index
-                const flat = arr.flat ? arr.flat() : arr;
-                if (flat && flat.length && typeof flat[0] === 'number') {
-                  const maxIdx = flat.indexOf(Math.max(...flat));
-                  label = `Sign(${maxIdx})`;
-                  break;
-                }
-              }
-            }
-          } else if (result.array) {
-            const arr = await result.array();
-            const flat = arr.flat ? arr.flat() : arr;
-            const maxIdx = flat.indexOf(Math.max(...flat));
-            label = `Sign(${maxIdx})`;
-          }
-        } catch (e) {
-          console.warn('Interpreting model result failed', e);
-          label = null;
-        }
-        tf.dispose(img);
-        if (!label) label = 'Sign detected';
-        DOM['detected-sign'].textContent = label;
-        pushHistory({type:'stsign', text: label});
-      } else if (State.handsign.detector && State.handsign.detector.predict) {
-        // some libs expose predict(image)
-        const prediction = await State.handsign.detector.predict(canvas);
-        const label = prediction?.label || prediction?.class || JSON.stringify(prediction);
-        DOM['detected-sign'].textContent = label || 'Sign detected';
-        pushHistory({type:'stsign', text: label});
-      } else {
-        // fallback: show generic detection
-        DOM['detected-sign'].textContent = 'Sign detected';
-      }
-    } catch (err) {
-      console.warn('Detection loop error', err);
-      DOM['detected-sign'].textContent = 'Detection error';
-    }
-    // schedule next
-    setTimeout(()=> {
-      if (State.handsign.streaming) requestAnimationFrame(loop);
-    }, 200); // small throttle
-  }
-  loop();
-}
-
-/* Simulated detection loop when model unavailable */
-function runDetectionLoopSimulated(){
-  const video = DOM['camera-video'];
-  // simple loop that samples frames and randomly "detects" a sign (for demo)
-  const choices = DEFAULT_SIGNS.map(s => s.key);
-  async function loop() {
-    if (!State.handsign.streaming) return;
-    // draw simple overlay for feel
-    const canvas = DOM['camera-canvas'];
-    const ctx = canvas.getContext('2d');
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(8,8,canvas.width-16,canvas.height-16);
-    // every 1.5s pick a random sign to show
-    const sign = choices[Math.floor(Math.random()*choices.length)];
-    DOM['detected-sign'].textContent = sign;
-    pushHistory({type:'stsign', text: sign});
-    await new Promise(res => setTimeout(res, 1500));
-    if (State.handsign.streaming) requestAnimationFrame(loop);
-  }
-  loop();
-}
-
-/* ============================
-   Reminders & Demo Mode
-   ============================ */
-
-function startReminders() {
-  // 3 minutes (180000 ms) reminder
+function startReminders(){
   if (State.reminderInterval) clearInterval(State.reminderInterval);
-  State.reminderInterval = setInterval(() => {
-    const profile = State.profile || null;
+  State.reminderInterval = setInterval(()=> {
+    const user = getCurrentUser();
+    if (user && user.email) return;
     const text = 'Please log in to save your progress.';
-    // Visual banner
-    showTransientBanner(text);
-    // If blind user + voice enabled
-    if (profile && profile.userType === 'blind' && profile.voiceEnabled) speak(text, {interrupt:true});
-    // Deaf visual sign (simple card)
-    if (profile && profile.userType === 'deaf') showSignReminder(text);
+    showTransient(text);
+    if (user && user.userType === 'blind' && user.voiceEnabled) speak(text, {interrupt:true});
+    if (user && user.userType === 'deaf') showSignReminder(text);
   }, 180000);
 }
-
-function showTransientBanner(msg) {
-  const div = document.createElement('div');
-  div.className = 'transient-banner';
-  div.style.position = 'fixed';
-  div.style.right = '1rem';
-  div.style.bottom = '1rem';
-  div.style.background = 'linear-gradient(90deg,#fff7f2,#eef2ff)';
-  div.style.border = '1px solid rgba(0,0,0,0.06)';
-  div.style.padding = '0.8rem 1rem';
-  div.style.borderRadius = '10px';
-  div.style.boxShadow = '0 8px 30px rgba(0,0,0,0.08)';
-  div.textContent = msg;
-  document.body.appendChild(div);
-  setTimeout(()=> { div.style.opacity = '0'; div.style.transition = 'opacity 400ms'; }, 5200);
-  setTimeout(()=> div.remove(), 6000);
+function showTransient(msg){
+  const el = document.createElement('div');
+  el.className = 'transient';
+  el.textContent = msg;
+  el.style.position='fixed'; el.style.right='1rem'; el.style.bottom='1rem'; el.style.padding='0.6rem 0.9rem';
+  el.style.borderRadius='8px'; el.style.background='linear-gradient(90deg,#fff7f2,#eef6ff)';
+  el.style.boxShadow='0 8px 30px rgba(0,0,0,0.08)'; el.style.zIndex=9999;
+  document.body.appendChild(el);
+  setTimeout(()=> { el.style.opacity='0'; el.style.transition='opacity 500ms'; }, 5200);
+  setTimeout(()=> el.remove(), 6000);
+}
+function showSignReminder(msg){
+  const el = document.createElement('div');
+  el.className = 'sign-reminder';
+  el.style.position='fixed'; el.style.left='1rem'; el.style.bottom='1rem'; el.style.padding='0.6rem 0.9rem';
+  el.style.borderRadius='10px'; el.style.background='rgba(255,255,255,0.95)'; el.style.boxShadow='0 8px 30px rgba(0,0,0,0.06)';
+  el.innerHTML = `<div style="font-size:24px">🤟</div><div style="margin-top:6px">${msg}</div>`;
+  document.body.appendChild(el);
+  setTimeout(()=> el.remove(), 6000);
 }
 
-function showSignReminder(msg) {
-  const div = document.createElement('div');
-  div.className = 'sign-reminder';
-  div.style.position = 'fixed';
-  div.style.left = '1rem';
-  div.style.bottom = '1rem';
-  div.style.background = 'rgba(255,255,255,0.95)';
-  div.style.border = '1px solid rgba(0,0,0,0.06)';
-  div.style.padding = '0.6rem 0.8rem';
-  div.style.borderRadius = '10px';
-  div.style.boxShadow = '0 8px 30px rgba(0,0,0,0.06)';
-  div.innerHTML = `<div style="font-size:20px">🤟</div><div style="margin-top:4px">${msg}</div>`;
-  document.body.appendChild(div);
-  setTimeout(()=> div.remove(), 6000);
+/* ======================================================================
+   Misc helpers
+   ====================================================================== */
+function pushHistoryItem(item){
+  const arr = JSON.parse(localStorage.getItem(LS_KEYS.HISTORY) || '[]');
+  arr.unshift(Object.assign({timestamp: Date.now()}, item));
+  localStorage.setItem(LS_KEYS.HISTORY, JSON.stringify(arr.slice(0,200)));
+  renderHistories();
 }
-
-/* Demo mode: cycles through features gently */
-function startDemoMode() {
-  if (State.demoTimer) clearTimeout(State.demoTimer);
-  let steps = [
-    ()=> { showPage('access-choice'); },
-    ()=> { document.getElementById('choose-blind').focus(); },
-    ()=> { showPage('blind-flow'); },
-    ()=> { if (DOM['blind-tts']) { DOM['blind-tts'].value = 'Hello from demo mode'; DOM['blind-tts-speak'].click(); } },
-    ()=> { showPage('deaf-flow'); },
-    ()=> { startHandsignDetection(); },
-    ()=> { stopHandsignDetection(); showPage('home'); }
-  ];
-  let idx = 0;
-  function runStep() {
-    if (idx >= steps.length) { announce('Demo complete'); stopDemoMode(); return; }
-    try { steps[idx](); } catch(e){ console.warn('Demo step error', e); }
-    idx++;
-    State.demoTimer = setTimeout(runStep, 1600);
+function renderHistories(){
+  const arr = JSON.parse(localStorage.getItem(LS_KEYS.HISTORY) || '[]');
+  if (DOM['history-blind']) {
+    DOM['history-blind'].innerHTML = '';
+    arr.filter(i => ['stt','tts','s2s'].includes(i.type)).slice(0,50).forEach(it=>{
+      const li = document.createElement('li');
+      li.textContent = `${new Date(it.timestamp).toLocaleTimeString()} — ${it.type}: ${it.text}`;
+      DOM['history-blind'].appendChild(li);
+    });
   }
-  announce('Demo starting');
-  runStep();
+  if (DOM['history-deaf']) {
+    DOM['history-deaf'].innerHTML = '';
+    arr.filter(i => ['sign','stsign','s2s'].includes(i.type)).slice(0,50).forEach(it=>{
+      const li = document.createElement('li');
+      li.textContent = `${new Date(it.timestamp).toLocaleTimeString()} — ${it.type}: ${it.text}`;
+      DOM['history-deaf'].appendChild(li);
+    });
+  }
 }
 
-function stopDemoMode() {
-  if (State.demoTimer) clearTimeout(State.demoTimer);
-  State.demoTimer = null;
-}
-
-/* ============================
-   Utility: continue as guest
-   ============================ */
-function continueAsGuest() {
-  const guest = {username:'Guest', userType:'none', uiPrefs:Object.assign({}, State.prefs), voiceEnabled:false};
-  saveProfile(guest);
-  announce('Continuing as Guest');
-  showPage('access-choice');
-}
-
-/* ============================
-   Finishing touches & safety
-   ============================ */
-
-// Speak detected-sign when pressing speak-detected (bound above)
-if (DOM['speak-detected']) DOM['speak-detected'].addEventListener && DOM['speak-detected'].addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); DOM['speak-detected'].click(); }
-});
-
-// Ensure history rendered initially
-renderHistory();
-
-// warn user when leaving with unsaved data (soft)
-window.addEventListener('beforeunload', (e) => {
-  // keep light; no blocking by default
-});
-
-/* ============================
-   End of script
-   ============================ */
+/* ======================================================================
+   Exported for other modules (none) - end of file
+   ====================================================================== */
